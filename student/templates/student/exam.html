@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Exam Portal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Add MathJax support -->
     <script>
@@ -1134,6 +1135,22 @@
                 </div>
             </div>
         </div>
+
+        <!-- Success Modal -->
+        <div class="modal fade" id="successModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">Success!</h5>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                        <h4>Exam Submitted Successfully!</h4>
+                        <p class="mb-0">Your answers have been recorded. You will be redirected to the results page shortly.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="time-panel">
@@ -1226,11 +1243,12 @@
         document.addEventListener("visibilitychange", function () {
             if (document.hidden) {
                 tabSwitchCount++;
-                alert("Tab switching detected! Stay on the exam page.");
+
+                // Show success modal instead of alert
+                showSuccessModal();
 
                 // Auto-submit the exam if tab is switched too many times
                 if (tabSwitchCount >= 3) {
-                    alert("Multiple tab switches detected! Exam will be submitted.");
                     submitExam();
                 }
             }
@@ -1400,7 +1418,7 @@
                 let displayText = question[key];
                 if (question[key].includes('\\') && !question[key].startsWith('\\(')) {
                     let latexOption = question[key].replace(/\\/g, "\\\\");
-                    displayText = `\\(${latexOption}\\)`; 
+                    displayText = `\\(${latexOption}\\)`;
                 } else if (question[key].startsWith('\\(') && question[key].endsWith('\\)')) {
                     displayText = question[key];
                 }
@@ -1449,7 +1467,7 @@
 
             // Update the side summary grid
             updateSideSummaryGrid();
-        
+
         // Helper functions needed for the updated version
         function containsLatex(text) {
             if (!text) return false;
@@ -1786,9 +1804,14 @@
                     document.getElementById('submit-loading').remove();
 
                     if (data.success) {
-                        // Redirect to the exam result page
+                        // Show success modal before redirecting
+                        showSuccessModal();
+
+                        // Redirect to the exam result page after a short delay
                         console.log("Redirecting to:", data.redirect_url);
-                        window.location.href = data.redirect_url;
+                        setTimeout(function() {
+                            window.location.href = data.redirect_url;
+                        }, 3000); // 3 second delay to show the success message
                     } else {
                         alert("Error: " + data.error);
                     }
@@ -1803,12 +1826,31 @@
                 });
         }
 
-        // Initialize Bootstrap Modal
+        // Initialize Bootstrap Modals
         let summaryModal;
+        let successModal;
+
+        // Helper function to safely show the success modal
+        function showSuccessModal() {
+            if (document.readyState === 'complete') {
+                // If DOM is already loaded
+                if (!successModal) {
+                    successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                }
+                successModal.show();
+            } else {
+                // Wait for DOM to be ready
+                document.addEventListener('DOMContentLoaded', function() {
+                    successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                    successModal.show();
+                });
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', function () {
-            // Initialize the modal
+            // Initialize the modals
             summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
+            successModal = new bootstrap.Modal(document.getElementById('successModal'));
 
             // Add click handler for summary button
             document.getElementById('summary-btn').addEventListener('click', showSummary);
