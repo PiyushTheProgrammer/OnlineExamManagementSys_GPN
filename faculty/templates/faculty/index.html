@@ -4,195 +4,273 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Examination System</title>
+    <title>Online Examination System | Government Polytechnic Nashik</title>
     <link rel="icon" href="{% static 'faculty/images/favicon.ico' %}" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <style>
-        /* General Reset */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
+        :root {
+            --primary-blue: #003366;
+            --accent-yellow: #FFCC00;
+            --light-blue: #0066CC;
+            --dark-blue: #001a33;
+            --white: #ffffff;
+            --light-gray: #f8f9fa;
         }
-
-        /* Background Setup */
+        
         body {
-            margin: 0;
-            padding: 0;
-            background: url('{% static "faculty/images/backgroundj.jpeg" %}') no-repeat center center/cover;
-            background-attachment: fixed;
+            font-family: 'Poppins', sans-serif;
+            color: var(--primary-blue);
+            background-color: var(--light-gray);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            position: relative;
         }
-
-        /* Overlay for slight dimming */
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.2);
-            z-index: 0;
-        }
-
+        
         /* Navbar */
         .navbar {
-            background: rgba(0, 51, 102, 0.9);
-            color: white;
-            padding: 8px 0;
-            z-index: 2;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        .navbar-brand {
-            display: flex;
-            align-items: center;
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: #FFCC00 !important;
-        }
-
-        .college-logo {
-            height: 60px;
-            width: auto;
-            margin-right: 12px;
-            border-radius: 4px;
-        }
-
-        .nav-link {
-            color: white !important;
-            text-decoration: none;
-            margin-left: 12px;
-            transition: 0.3s;
-            font-size: 0.95rem;
-        }
-
-        .nav-link:hover {
-            color: #FFCC00 !important;
-        }
-
-        /* Main Content Container */
-        .main-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 30px 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Glassmorphism Box */
-        .glass-box {
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 16px;
-            padding: 40px 30px;
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            margin: 20px 0;
-        }
-
-        /* Text Styling */
-        .glass-box h1 {
-            color: white;
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 12px;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
-
-        .glass-box h3 {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 1.2rem;
-            font-weight: 400;
-            margin-bottom: 20px;
-        }
-
-        .glass-box p {
-            color: rgba(255, 255, 255, 0.85);
-            margin-bottom: 8px;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-
-        .lead-text {
-            font-size: 1rem;
-            margin: 20px 0 15px;
-            font-weight: 500;
-            color: white;
-        }
-
-        /* Button Styling */
-        .btn-custom {
-            background: #FFCC00;
-            color: #003366;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 25px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
+            background-color: var(--white);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
-            display: inline-block;
-            text-decoration: none;
-            margin-top: 15px;
+        }
+        
+        .navbar.scrolled {
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
-
-        .btn-custom:hover {
-            background: #003366;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-blue) !important;
+            font-size: 1.4rem;
+            transition: transform 0.3s ease;
         }
+        
+        .navbar-brand:hover {
+            transform: translateX(5px);
+        }
+        
+        .logo-img {
+            height: 50px;
+            margin-right: 12px;
+            transition: transform 0.3s ease;
+        }
+        
+        .navbar-brand:hover .logo-img {
+            transform: rotate(5deg);
+        }
+        
+        .nav-link {
+            color: var(--primary-blue) !important;
+            font-weight: 500;
+            margin: 0 8px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: 0;
+            left: 0;
+            background-color: var(--light-blue);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        
+        .nav-link:hover {
+            color: var(--light-blue) !important;
+        }
+        
+        /* Hero Section */
+        .hero-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 80px 0;
+            background-color: var(--white);
+            background-image: linear-gradient(rgba(51, 102, 204, 0.7), rgba(60, 67, 122, 0.7)),
+                            url('{% static "faculty/images/backgroundj.jpeg" %}');
 
+            /* Option 2: Professional Dark Blue to Light gradient */
+            background-image: linear-gradient(rgba(0, 51, 102, 0.6), rgba(180, 187, 208, 0.6)),
+                            url('{% static "faculty/images/backgroundj.jpeg" %}');
+
+            /* Option 3: Modern Blue-Gray gradient */
+            background-image: linear-gradient(rgba(41, 128, 185, 0.65), rgba(64, 67, 88, 0.65)),
+                            url('{% static "faculty/images/backgroundj.jpeg" %}');
+            background-size: cover;
+            background-position: center;
+            color: white;
+        }
+        
+        .hero-content {
+            width: 100%;
+            text-align: center;
+        }
+        
+        .main-title {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            /* color: var(--white); */
+            color: rgb(255, 255, 254);
+            animation: fadeInDown 0.8s ease-out;
+        }
+        
+        .institution-name {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            color: var(--white);
+            animation: fadeIn 1s ease-out 0.3s both;
+        }
+        
+        .lead-text {
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            font-weight: 900;
+            color: var(--white);
+            animation: fadeIn 1s ease-out 0.6s both;
+        }
+        
+        /* Login Button */
+        .btn-login {
+            background-color: var(--accent-yellow);
+            color: var(--primary-blue);
+            font-weight: 600;
+            padding: 12px 35px;
+            border-radius: 5px;
+            border: none;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            font-size: 1.1rem;
+            animation: fadeInUp 0.8s ease-out 0.9s both;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-login:hover {
+            background-color: #e6b800;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+            color: var(--primary-blue);
+        }
+        
+        .btn-login::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: 0.5s;
+        }
+        
+        .btn-login:hover::after {
+            left: 100%;
+        }
+        
+        /* Footer */
+        .footer {
+            background-color: var(--primary-blue);
+            padding: 0.5rem 0;
+            color: var(--white);
+            transition: all 0.3s ease;
+        }
+        
+        .footer:hover {
+            background-color: var(--dark-blue);
+        }
+        
+        .footer p {
+            margin-bottom: 0;
+            transition: transform 0.3s ease;
+        }
+        
+        .footer:hover p {
+            transform: scale(1.02);
+        }
+        
+        /* Custom Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
         /* Responsive Adjustments */
-        @media (max-width: 576px) {
-            .glass-box {
-                padding: 30px 20px;
-                max-width: 90%;
+        @media (max-width: 992px) {
+            .main-title {
+                font-size: 2.2rem;
             }
             
-            .glass-box h1 {
-                font-size: 1.6rem;
+            .institution-name {
+                font-size: 1.5rem;
             }
             
-            .glass-box h3 {
+            .lead-text {
                 font-size: 1.1rem;
             }
-            
-            .navbar-brand {
-                font-size: 1.1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 1.8rem;
             }
             
-            .college-logo {
-                height: 35px;
-                margin-right: 8px;
+            .institution-name {
+                font-size: 1.3rem;
+            }
+            
+            .lead-text {
+                font-size: 1rem;
+                margin-bottom: 2rem;
+            }
+            
+            .btn-login {
+                padding: 10px 25px;
+            }
+            
+            /* Reduce animation intensity on mobile */
+            .main-title, .institution-name, .lead-text, .btn-login {
+                animation: fadeIn 0.8s ease-out !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="overlay"></div>
-
-    <nav class="navbar navbar-expand-lg">
-        <div class="container-fluid">
-            <a class="navbar-brand me-auto" href="#">
-                <img src="{% static 'faculty/images/logo.jpg' %}" alt="College Logo" class="college-logo">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="{% static 'faculty/images/logo.jpg' %}" alt="College Logo" class="logo-img d-inline-block align-top">
                 Government Polytechnic Nashik
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -200,41 +278,70 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'index' %}">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'faculty_login' %}">Faculty Login</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">About</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'contact' %}">Contact us</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'index' %}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'faculty_login' %}">Faculty Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'about' %}">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'contact' %}">Contact us</a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
-    
-    <div class="main-container">
-        <div class="glass-box">
-            <h1>Online Examination</h1>
-            
 
-                
-            <a href="{% url 'student:student_login' %}" class="btn-custom">📖 Sign in as student</a>     
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="main-title">Online Examination System</h1>
+                <h2 class="institution-name">Where Exams Meet Excellence</h2>
+                <p class="lead-text">
+                    A secure, intuitive platform designed to streamline online exams.
+Empowering educators and students with reliability and ease.
+                </p>
+                <div>
+                    <a href="{% url 'student:student_login' %}" class="btn btn-login">
+                        <i class="fas fa-sign-in-alt me-2"></i> Student Login
+                    </a>
+                </div>
             </div>
-            
-            
-            
         </div>
-    </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <p>&copy; 2025 Online Examination System | Developed by GPN-ITR Faculty Team</p>
+        </div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Initialize tooltips and popovers
-        document.addEventListener('DOMContentLoaded', function() {
-            var navbarToggler = document.querySelector('.navbar-toggler');
-            var navbarCollapse = document.querySelector('.navbar-collapse');
-            
-            navbarToggler.addEventListener('click', function() {
-                navbarCollapse.classList.toggle('show');
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 10) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+        
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
             });
         });
     </script>
-    
 </body>
 </html>
