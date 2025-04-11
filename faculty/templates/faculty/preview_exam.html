@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Preview</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            max-width: 800px;
+            margin: auto;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #666;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f9f9f9;
+        }
+
+        .search-box {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .search-box input {
+            padding: 8px;
+            width: 200px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .ok-btn {
+            display:inline-block;
+            width:auto;
+            margin:20px auto;
+            padding: 12px 20px;
+            font-size: 14px;
+            color: white;
+            background-color: #1ca80f;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s ease-in-out;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase
+
+        }
+
+        .ok-btn:hover {
+            background-color: #0bac21;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Exam Preview</h1>
+
+        <h2>Exam Name: {{ exam.exam_name }}</h2>
+        <h2>Exam Type: {{ exam.exam_type }}</h2>
+        <h2>Total Marks: {{ exam.total_marks }}</h2>
+        <h2>Number of Units: {{ exam.num_units }}</h2>
+        <h2>Total Questions: {{ total_questions }}</h2>
+
+        <h3>Questions per Unit:</h3>
+        <ul>
+            {% for unit in exam.question_sheet %}
+                <li>Unit {{ unit.unit }}: {{ unit.questions|length }} questions ({{ unit.totalMarks }} marks)</li>
+            {% endfor %}
+        </ul>
+
+        <h3>Students Taking This Exam:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Roll No</th>
+                    <th>Name</th>
+                    <th>Branch</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                    <tr>
+                        <td>{{ student.roll_no }}</td>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.registered_courses.first.branch }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- OK Button -->
+        <form action="{% url 'take_exam' %}" method="get">
+            <button type="submit" class="ok-btn">OK</button>
+        </form>
+    </div>
+</body>
+</html>
