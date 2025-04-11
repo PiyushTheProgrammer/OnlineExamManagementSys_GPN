@@ -18,7 +18,7 @@
             --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             --transition: all 0.3s ease;
         }
-       
+
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -195,7 +195,7 @@
                 max-width: 100%;
                 padding: 0 10px;
             }
-            
+
             .header h1 {
                 font-size: 2rem;
             }
@@ -214,7 +214,7 @@
                 gap: 0.8rem;
             }
 
-            .filters select, 
+            .filters select,
             .filters button {
                 font-size: 0.9rem;
             }
@@ -451,7 +451,7 @@
 
     <div class="container">
         <div class="header">
-            <h1>Student Dashboard</h1>
+            <h1 style="color: white;">Student Dashboard</h1>
         </div>
 
         <div class="filters">
@@ -486,7 +486,7 @@
         </div>
 
         <div class="section-header">Student Exam Details</div>
-        
+
         <div class="table-container">
             <table>
                 <thead>
@@ -546,6 +546,17 @@
     </div>
 
     <script>
+        // Auto refresh functionality - refresh every 2 seconds
+        function setupAutoRefresh() {
+            setTimeout(function() {
+                // Reload the page while preserving current filters
+                location.reload();
+            }, 2000); // 2000 milliseconds = 2 seconds
+        }
+
+        // Initialize auto refresh when page loads
+        document.addEventListener('DOMContentLoaded', setupAutoRefresh);
+
         function applyFilters() {
             // Get selected values from filters
             const departmentFilter = document.getElementById('departmentFilter').value;
