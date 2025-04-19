@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import timezone
 from django.contrib.auth.decorators import login_required
@@ -122,6 +123,7 @@ def add_student(request):
             # Get form data
             name = request.POST.get("name")
             roll_no = request.POST.get("roll_no")  # Fixed typo in Post -> POST
+            branch = request.POST.get("branch")  # Get branch from form
             course_codes = request.POST.getlist("course_codes")  # Get multiple courses
             password = roll_no  # Using roll_no as default password
 
@@ -140,7 +142,8 @@ def add_student(request):
                 user=user,
                 name=name,
                 roll_no=roll_no,
-                password=password
+                password=password,
+                branch=branch  # Set branch
             )
 
             # Add courses to student
@@ -171,13 +174,11 @@ def add_course(request):
         course_name = request.POST.get('name')
         course_code = request.POST.get('code')
         year = request.POST.get('year')
-        branch = request.POST.get('branch')
 
         Course.objects.create(
             name=course_name,
             code=course_code,
             year=year,
-            branch=branch,
             faculty=faculty
         )
 
@@ -313,6 +314,21 @@ def add_exam_specifications(request):
                 exam_duration_minutes=duration_minutes,
             )
 
+
+            # NEW: Create Result objects for all students registered in this course
+            course = Course.objects.get(code=course_code)
+            students = Student.objects.filter(registered_courses=course)
+            
+            for student in students:
+                Result.objects.create(
+                    student=student,
+                    exam=exam,
+                    total_marks=exam.total_marks,
+                    obtained_marks=0,
+                    percentage=0.0,
+                    submitted_at=None  # Will be set when student submits
+                )
+
             messages.success(request, "Exam details saved successfully!")
             return redirect("preview_exam", exam_id=exam.id)
 
@@ -363,6 +379,7 @@ def truncate_specifications(request):
 def upload_students(request):
     print("📌 upload_students function was called!")  # Debugging
     courses = Course.objects.all().order_by('name')
+    branches = Student.BRANCH_CHOICES
 
     if request.method == "POST":
         form = CSVUploadStudentForm(request.POST, request.FILES)
@@ -382,28 +399,23 @@ def upload_students(request):
                 # Get or create the "Students" group
                 students_group, created = Group.objects.get_or_create(name='Students')
                 for row in reader:
-                    print(f"📌 Processing Row: {row}")
                     roll_no = row[0].strip()
                     name = row[1].strip()
-                    registered_courses = row[2].strip().split("|")  # Split courses
-                    print(f"📌 Roll No: {roll_no}, Name: {name}, Registered Courses: {registered_courses}")
-
-                    # Use custom password if provided, otherwise use roll_no
+                    
+                    registered_courses = row[2].strip().split("|")  # Courses are now in column 4
+                    branch = row[3].strip()  # Get branch from CSV
                     password = default_password if default_password else roll_no
 
-                    # Create or get the User object
                     user, created = User.objects.get_or_create(
                         username=roll_no,
                         defaults={'password': password}
                     )
 
                     if not created:
-                        # If user exists, update the password if it's different
                         if not user.check_password(password):
                             user.set_password(password)
                             user.save()
 
-                    # Assign the user to the "Students" group
                     user.groups.add(students_group)
 
                     # Create or update the Student record
@@ -414,6 +426,7 @@ def upload_students(request):
                             "name": name,
                             "password": password  # This is just for display
                         },
+                        branch =branch
                     )
 
                     # Register courses
@@ -424,6 +437,7 @@ def upload_students(request):
                             student.registered_courses.add(course)
 
                     student.save()
+                    
                 messages.success(request, "✅ Students uploaded successfully!")
                 return redirect("upload_students")
             except Exception as e:
@@ -435,23 +449,22 @@ def upload_students(request):
         form = CSVUploadStudentForm()
 
 
-
-    return render(request, "faculty/upload_students.html", {"form": form,"courses":courses})
+    return render(request, "faculty/upload_students.html", {"form": form,"courses":courses,"branches":branches})
 
 @login_required
 @user_passes_test(is_faculty)
 def view_students(request):
     # Get search query if exists
     search_query = request.GET.get('search', '')
-      # Get all students ordered by batch then roll number
-    students = Student.objects.all().order_by('registered_courses__branch', 'roll_no')
+    # Get all students ordered by branch then roll number
+    students = Student.objects.all().order_by('branch', 'roll_no')
 
     # Apply search filter if query exists
     if search_query:
         students = students.filter(
             Q(roll_no__icontains=search_query) |
             Q(name__icontains=search_query) |
-            Q(registered_courses__branch__icontains=search_query)
+            Q(branch__icontains=search_query)  # Changed from registered_courses__branch to branch
         ).distinct()
 
     context = {
@@ -459,6 +472,7 @@ def view_students(request):
         'search_query': search_query,
     }
     return render(request, 'faculty/view_students.html', context)
+
 from django.views.decorators.http import require_POST
 @require_POST
 def save_attendance(request):
@@ -549,6 +563,7 @@ def reset_student_password(request):
         'message': 'Invalid request method'
     })
 from django.db import transaction
+
 @login_required
 @user_passes_test(is_faculty, login_url='/faculty_login/')
 def truncate_students(request):
@@ -571,32 +586,50 @@ def truncate_students(request):
 
                 messages.success(request, f"✅ All {count} students have been deleted successfully!")
             else:
-                # Delete students from selected course only
+                # Delete students from selected course and branch
                 course_id = request.POST.get('course_id')
+                branch_value = request.POST.get('branch_id')
+                print(f"Received course_id: {course_id}, branch_value: {branch_value}")  # Debug
+
                 if not course_id:
                     messages.error(request, "Please select a course")
                     return redirect("upload_students")
+                if not branch_value:
+                    messages.error(request, "Please select a branch")
+                    return redirect("upload_students")
 
                 course = Course.objects.get(id=course_id)
-
-                # Get students registered for this course
-                students = Student.objects.filter(registered_courses=course)
+                 # Debug: Print all students with this branch
+                all_students_with_branch = Student.objects.filter(branch=branch_value)
+                print(all_students_with_branch)
+                # Get students registered for this course and branch
+                students = Student.objects.filter(
+                    registered_courses__id=course_id,  # Use __id for M2M relationship
+                    branch=branch_value
+                ).distinct()  # Add distinct() to avoid duplicates
+                
                 user_ids = students.values_list('user_id', flat=True)
+                count = students.count()  # Count after filtering
 
-                # Get count before deletion
-                count = user_ids.count()
+                if count == 0:
+                    branch_name = dict(Student.BRANCH_CHOICES).get(branch_value, branch_value)
+                    messages.warning(request, f"⚠️ No students found registered for {course.name} in {branch_name} branch!")
+                    return redirect("upload_students")
 
                 # Delete students and their users
                 with transaction.atomic():
                     students.delete()
                     User.objects.filter(id__in=user_ids).delete()
 
-                messages.success(request, f"✅ {count} students registered for {course.name} have been deleted successfully!")
+                branch_name = dict(Student.BRANCH_CHOICES).get(branch_value, branch_value)
+                messages.success(request, f"✅ {count} students registered for {course.name} in {branch_name} branch have been deleted successfully!")
 
+        except Course.DoesNotExist:
+            messages.error(request, "Selected course does not exist")
+        except Group.DoesNotExist:
+            messages.error(request, "Students group does not exist")
         except Exception as e:
             messages.error(request, f"An error occurred: {str(e)}")
-            # Log the error for debugging
-            import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error deleting students: {str(e)}")
 
@@ -610,62 +643,77 @@ def upload_questions(request):
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
             csv_file = request.FILES['file']
+            error_messages = []
 
-            # Ensure correct file type
             if not csv_file.name.endswith('.csv'):
-                messages.error(request, 'File format is not supported. Please upload a CSV file.')
+                messages.error(request, '❌ Please upload a valid CSV file.')
                 return redirect('upload_questions')
 
             try:
-                # ✅ Read CSV File
-                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                # Handle file encoding
+                try:
+                    decoded_file = csv_file.read().decode('utf-8').splitlines()
+                except UnicodeDecodeError:
+                    csv_file.seek(0)
+                    decoded_file = csv_file.read().decode('latin-1').splitlines()
+
                 reader = csv.reader(decoded_file)
-                next(reader, None)  # Skip header row safely
+                next(reader, None)  # Skip header row
 
-
-                # ✅ Insert Questions
                 for row in reader:
-                    print(f"📌 Processing Row: {row}")  # Debugging
-                    if len(row) != 12:  # Ensure correct number of columns
-                        messages.error(request, "Insufficient no. of columns in CSV. Please check your file.")
-                        return redirect('upload_questions')
+                    try:
+                        if len(row) != 12:
+                            raise ValueError("Incorrect number of columns (expected 12)")
 
-                    sr_no, name, code, question_text, option1, option2, option3, option4, correct_answer, user_c_answer, mark, unit_no = row
+                        sr_no, code, name, question_text, option1, option2, option3, option4, correct_answer, user_c_answer, mark, unit_no = row
 
-                    # ✅ Ensure valid Course object
-                    course = Course.objects.filter(name=name.strip(), code=code.strip(), faculty=faculty).first()
-                    if not course:
-                        messages.error(request,f"No matching course found for {name} - {code} check your csv please")
+                        # Auto-create course if missing
+                        course, created = Course.objects.get_or_create(
+                            code=code.strip(),
+                            name=name.strip(),
+                            faculty=faculty,
+                            defaults={'description': 'Auto-created during upload'}
+                        )
+
+                        # Create the question
+                        Question.objects.create(
+                            sr_no=int(sr_no) if sr_no.strip() else None,
+                            course_name=name.strip(),
+                            course_code=code.strip(),
+                            question_text=question_text.strip(),
+                            option1=option1.strip(),
+                            option2=option2.strip(),
+                            option3=option3.strip(),
+                            option4=option4.strip(),
+                            correct_answer=correct_answer.strip(),
+                            user_c_answer=user_c_answer.strip() if user_c_answer.strip() else None,
+                            mark=int(mark) if mark.strip() else 1,
+                            unit_no=int(unit_no),
+                        )
+
+                    except Exception as e:
+                        error_messages.append(f"Error in row {row}: {str(e)}")
                         continue
-                    # ✅ Insert Question (EXPLICITLY SET faculty_id)
-                    # print(f"📌 Inserting Question: {question_text} , Faculty id: {faculty_id}")  # Debugging
-                    Question.objects.create(
-                        sr_no=int(sr_no),
-                        course_name=name,
-                        course_code=code,
-                        question_text=question_text.strip(),
-                        option1=option1.strip(),
-                        option2=option2.strip(),
-                        option3=option3.strip(),
-                        option4=option4.strip(),
-                        correct_answer=correct_answer.strip(),
-                        user_c_answer=user_c_answer,
-                        mark=int(mark),
-                        unit_no=int(unit_no),
-                    )
 
-                messages.success(request, "✅ Questions uploaded successfully!")
+                if error_messages:
+                    request.session['upload_errors'] = error_messages
+                    messages.error(request, "❌ Some questions failed to upload")
+                else:
+                    messages.success(request, "✅ All questions uploaded successfully!")
+                
                 return redirect('upload_questions')
 
             except Exception as e:
-                print(f"❌ Error: {e}")  # Print error for debugging
-                messages.error(request, f"Error uploading file: {e}")
+                messages.error(request, f"❌ File processing error: {str(e)}")
                 return redirect('upload_questions')
 
-    else:
-        form = CSVUploadForm()
-
-    return render(request, 'faculty/upload_questions.html', {'form': form})
+    # Get errors from session if they exist
+    upload_errors = request.session.pop('upload_errors', None)
+    
+    return render(request, 'faculty/upload_questions.html', {
+        'form': CSVUploadForm(),
+        'upload_errors': upload_errors
+    })
 
 from django.db.models import Q
 @login_required
@@ -813,11 +861,14 @@ def preview_exam(request, exam_id):
 def take_exam(request):
     if not is_faculty(request.user):
         raise PermissionDenied
+     # Get all exams for the current faculty member
+    faculty = request.user.faculty
+    exams = ExamSpecification.objects.filter(faculty=faculty).order_by('-id')
 
     if request.method == "POST":
-        exam_name = request.POST.get("exam_name")
-        if exam_name:
-            exam = ExamSpecification.objects.filter(exam_name=exam_name).first()
+        exam_id = request.POST.get("exam_id")  # Changed from exam_name to exam_id
+        if exam_id:
+            exam = ExamSpecification.objects.filter(id=exam_id, faculty=faculty).first()
             if exam:
                 course = Course.objects.filter(code=exam.course_code).first()
                 students = Student.objects.filter(registered_courses=course)
@@ -830,14 +881,14 @@ def take_exam(request):
                     exam.is_active = True
                     exam.start_time = now()
                     exam.save()
-                    messages.success(request, f"Exam '{exam_name}' has started and JSON files have been generated!")
+                    messages.success(request, f"Exam '{exam.exam_name}' has started and JSON files have been generated!")
                 except ValueError as e:
                     # Catch and display the error message
                     messages.error(request, str(e))
             else:
-                messages.error(request, "Exam not found!")
+                messages.error(request, "Exam not found or you don't have permission!")
         else:
-            messages.error(request, "Please enter a valid exam name.")
+            messages.error(request, "Please select a valid exam.")
     exams = ExamSpecification.objects.all()
     return render(request, "faculty/take_exam.html", {"exams": exams})
 
@@ -866,14 +917,18 @@ def generate_student_json_files(exam_id, students):
         raise ValueError(f"No questions found for course code: {exam.course_code}")
 
     # Group questions by unit
-    questions_by_unit = {}
+    questions_by_unit_and_mark = {}
     for question in all_questions:
         unit_no = question["unit_no"]
-        if unit_no not in questions_by_unit:
-            questions_by_unit[unit_no] = []
-        questions_by_unit[unit_no].append(question)
+        mark = question["mark"]
+        if unit_no not in questions_by_unit_and_mark:
+            questions_by_unit_and_mark[unit_no] = {}
+        if mark not in questions_by_unit_and_mark[unit_no]:
+            questions_by_unit_and_mark[unit_no][mark] = []
+        questions_by_unit_and_mark[unit_no][mark].append(question)
 
-    print("Questions grouped by unit:", questions_by_unit)
+
+    print("Questions grouped by unit:", questions_by_unit_and_mark)
 
     # Get the exam specifications
     try:
@@ -887,13 +942,13 @@ def generate_student_json_files(exam_id, students):
     for student in students:
         student_data = {
             "Exam_Details": {
-                "c_code": exam.course_code,
-                "c_name": exam.exam_name,
+                "course_code": exam.course_code,
+                "course_name": exam.exam_name,
                 "roll_no": student.roll_no,
                 "student_name": student.name,
                 "year": course.year,
-                "branch": course.branch,
-                "m_question": exam_spec.total_questions,
+                "branch": student.branch,
+                "max_question": exam_spec.total_questions,
                 "exam_type": exam.exam_type,
                 "exam_directory": exam_directory  # Store the exam directory path
             },
@@ -903,24 +958,31 @@ def generate_student_json_files(exam_id, students):
        # Step 1: Select questions based on the exam specification's question sheet
         selected_questions = []
         total_selected_marks = 0
+        used_question_ids = set()# Track which question IDs have been used for this student
 
         # Get the question distribution from the exam specification
         question_distribution = exam_spec.question_sheet  # This should be the JSON field from your model
 
         for unit in question_distribution:
             unit_num = unit['unit']
-            if unit_num not in questions_by_unit:
+            if unit_num not in questions_by_unit_and_mark:
                 raise ValueError(f"No questions found for unit {unit_num}")
 
             for mark in unit['questions']:
-                matching = [q for q in all_questions if q['unit_no'] == unit_num and q['mark'] == mark]
-                random.shuffle(matching)
-                if matching:
-                    selected = matching[0]  # or random.choice(matching)
-                else:
+                if mark not in questions_by_unit_and_mark[unit_num]:
                     raise ValueError(f"No questions found for Unit {unit_num} with {mark} marks")
 
+                # Get all questions for this unit and mark that haven't been used yet
+                available_questions = [
+                    q for q in questions_by_unit_and_mark[unit_num][mark] 
+                    if q['id'] not in used_question_ids
+                ]
+                if not available_questions:
+                    raise ValueError(f"No unique questions left for Unit {unit_num} with {mark} marks")
+
+                selected = random.choice(available_questions)    
                 selected_questions.append(selected)
+                used_question_ids.add(selected['id'])
                 total_selected_marks += mark
 
 
@@ -935,14 +997,14 @@ def generate_student_json_files(exam_id, students):
                 "q_no": i,
                 "q_id": question["id"],
                 "unit_no": question["unit_no"],
-                "question": question["question_text"],
+                "question_text": question["question_text"],
                 "latex_equation": question.get("latex_equation", ""),  # Add LaTeX equation field
-                "op1": question["option1"],
-                "op2": question["option2"],
-                "op3": question["option3"],
-                "op4": question["option4"],
-                "c_ans": question["correct_answer"],
-                "user_c_ans": "",
+                "option_1": question["option1"],
+                "option_2": question["option2"],
+                "option_3": question["option3"],
+                "option_4": question["option4"],
+                "correct_answer": question["correct_answer"],
+                "student_c_ans": "",
                 "marks": question["mark"],
             }
             student_data["Question_Bank"].append(question_data)
@@ -984,15 +1046,87 @@ from .models import Result, ExamSpecification
 @login_required
 @user_passes_test(is_faculty, login_url='/faculty_login/')
 def view_results(request):
-    # Fetch all results grouped by exam
+    # Fetch all exams
     exams = ExamSpecification.objects.all().order_by('id')
     exam_results = {}
-
+    
+    # Get search query from request
+    search_query = request.GET.get('search', '').strip()
+    
     for exam in exams:
-        results = Result.objects.filter(exam=exam).order_by('-submitted_at')
-        if results.exists():
-            exam_results[exam] = results
-
+        # Get the course for this exam
+        try:
+            course = Course.objects.get(code=exam.course_code)
+            # Get all students enrolled in this course
+            enrolled_students = course.students.all()
+            
+            # Apply search filter if provided
+            if search_query:
+                enrolled_students = enrolled_students.filter(
+                    Q(name__icontains=search_query) |
+                    Q(roll_no__icontains=search_query)
+                )
+            
+            total_students = enrolled_students.count()
+        except Course.DoesNotExist:
+            enrolled_students = Student.objects.none()
+            total_students = 0
+        
+        # Initialize counts
+        attended_count = 0
+        pending_count = 0
+        not_attended_count = 0
+        
+        # Determine status for each student
+        results_with_status = []
+        
+        for student in enrolled_students:
+            # Check if student has a result record for this exam
+            try:
+                result = Result.objects.get(exam=exam, student=student)
+                
+                if student.has_attempted_exam:
+                    # Student has attended and submitted
+                    status = 'attended'
+                    attended_count += 1
+                elif student.exam_start_time:
+                    # Student has started but not submitted
+                    status = 'pending'
+                    pending_count += 1
+                else:
+                    # Student hasn't started the exam
+                    status = 'not_attended'
+                    not_attended_count += 1
+                    
+                results_with_status.append({
+                    'student': student,
+                    'total_marks': result.total_marks,
+                    'obtained_marks': result.obtained_marks if status == 'attended' else 0,
+                    'percentage': result.percentage if status == 'attended' else 0.0,
+                    'status': status
+                })
+                
+            except Result.DoesNotExist:
+                # Student hasn't attended at all (no result record)
+                status = 'not_attended'
+                not_attended_count += 1
+                
+                results_with_status.append({
+                    'student': student,
+                    'total_marks': exam.total_marks,
+                    'obtained_marks': 0,
+                    'percentage': 0.0,
+                    'status': status
+                })
+        
+        exam_results[exam] = {
+            'results': sorted(results_with_status, key=lambda x: x['student'].roll_no),
+            'total_students': total_students,
+            'attended_count': attended_count,
+            'pending_count': pending_count,
+            'not_attended_count': not_attended_count,
+            'course_name': course.name if course else exam.course_code
+        }
     # If the 'download' parameter is present, generate and return the PDF for a specific exam
     if request.GET.get("download") == "pdf":
         exam_id = request.GET.get("exam_id")
@@ -1052,34 +1186,106 @@ def view_results(request):
     # If not downloading PDF, render the HTML template
     return render(request, 'faculty/view_results.html', {'exam_results': exam_results})
 
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from .models import Student, Result, ExamSpecification
+
+@require_GET
+def get_pending_students(request):
+    exam_id = request.GET.get('exam_id')
+    if not exam_id:
+        return JsonResponse({'error': 'Exam ID required'}, status=400)
+    
+    try:
+        exam = ExamSpecification.objects.get(id=exam_id)
+        # Get all students registered for this exam's course
+        all_students = Student.objects.filter(registered_courses=exam.course_code)
+        # Get students who have already attempted
+        attempted_roll_nos = Result.objects.filter(exam=exam).values_list('student__roll_no', flat=True)
+        # Get pending students
+        pending_students = all_students.exclude(roll_no__in=attempted_roll_nos)
+        
+        return JsonResponse({
+            'pending_students': [
+                {'roll_no': s.roll_no, 'name': s.name}
+                for s in pending_students
+            ]
+        })
+    except ExamSpecification.DoesNotExist:
+        return JsonResponse({'error': 'Exam not found'}, status=404)
+    
+@require_GET
+def get_exam_stats(request):
+    exam_id = request.GET.get('exam_id')
+    if not exam_id:
+        return JsonResponse({'error': 'Exam ID required'}, status=400)
+    
+    try:
+        exam = ExamSpecification.objects.get(id=exam_id)
+        total_students = Student.objects.filter(registered_courses=exam.course_code).count()
+        results = Result.objects.filter(exam=exam)
+        attempted_count = results.count()
+        pending_count = total_students - attempted_count
+        
+        # Calculate average score
+        avg_score = results.aggregate(avg=Avg('percentage'))['avg'] or 0
+        
+        # Get any new results (last 5 minutes)
+        from django.utils import timezone
+        from datetime import timedelta
+        new_results = results.filter(
+            submitted_at__gte=timezone.now() - timedelta(minutes=5)
+        ).order_by('-submitted_at')
+        
+        return JsonResponse({
+            'attempted_count': attempted_count,
+            'pending_count': pending_count,
+            'avg_score': avg_score,
+            'new_results': [
+                {
+                    'roll_no': r.student.roll_no,
+                    'name': r.student.name,
+                    'total_marks': r.total_marks,
+                    'obtained_marks': r.obtained_marks,
+                    'percentage': float(r.percentage)
+                }
+                for r in new_results
+            ]
+        })
+    except ExamSpecification.DoesNotExist:
+        return JsonResponse({'error': 'Exam not found'}, status=404)
 # Add course view
 @login_required
-@user_passes_test(is_faculty, login_url='/faculty_login/')
+# @user_passes_test(is_faculty, login_url='/faculty_login/')
+@user_passes_test(is_faculty)
 def view_student(request):
-    # Fetch all students from the database
-    students = Student.objects.all()
-    courses = Course.objects.all()  # Fetch all courses for the dropdown
-        # Initialize filter variables
-    department_filter = ''
-    course_filter = ''
-    status_filter = ''
-
-    # Handle POST request
-    # if request.method == 'POST':
-    # Get filter parameters from the request
+    """Detailed view of student exam statuses"""
+    # Initialize variables
+    students = Student.objects.all().order_by('branch', 'roll_no')
+    courses = Course.objects.all()
+    
+    # Get filter parameters
+    search_query = request.GET.get('search', '').strip()
     department_filter = request.GET.get('department', '').strip()
     course_filter = request.GET.get('course', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
-    # Apply filters if provided
+    # Apply filters
+    if search_query:
+        students = students.filter(
+            Q(name__icontains=search_query) | 
+            Q(roll_no__icontains=search_query) |
+            Q(branch__icontains=search_query)
+        )
+    
     if department_filter:
-    # Filter students based on the branch of their registered courses
-        students = students.filter(registered_courses__branch=department_filter).distinct()
-
+        students = students.filter(branch=department_filter)
+    
     if course_filter:
-    # Filter students based on the course code of their registered courses
         students = students.filter(registered_courses__code=course_filter).distinct()
-
+    
     if status_filter:
         if status_filter == "attended":
             students = students.filter(has_attempted_exam=True)
@@ -1088,20 +1294,22 @@ def view_student(request):
         elif status_filter == "in-progress":
             students = students.filter(exam_start_time__isnull=False, has_attempted_exam=False)
 
-    # Add branch information to each student
+    # Calculate time remaining for each student
     for student in students:
-        # Get the branch of the first registered course (or default to "Unknown")
-        first_course = student.registered_courses.first()
-        student.branch = first_course.branch if first_course else "Unknown"
+        if student.exam_start_time and not student.has_attempted_exam:
+            time_elapsed = timezone.now() - student.exam_start_time
+            student.time_remaining = max(0, 3600 - time_elapsed.total_seconds())  # Assuming 1 hour exam
+        else:
+            student.time_remaining = 0
 
-    # Pass the students and filters to the template
     context = {
         'students': students,
+        'courses': courses,
+        'branches': Student.BRANCH_CHOICES,
+        'search_query': search_query,
         'department_filter': department_filter,
         'course_filter': course_filter,
         'status_filter': status_filter,
-        'courses': courses,
-        'branches': Course.BRANCH_CHOICES,  # Pass branch choices from the Course model
     }
     return render(request, 'faculty/view_student.html', context)
 

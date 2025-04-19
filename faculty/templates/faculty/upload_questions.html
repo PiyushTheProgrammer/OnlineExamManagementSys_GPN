@@ -993,6 +993,71 @@
             color: rgb(0, 0, 0);
             transform: translateX(5px);
         }
+
+        .error-card {
+            margin-top: 20px;
+            border: 1px solid #dc3545;
+        }
+
+        .error-card-header {
+            background-color: #dc3545;
+            color: white;
+            font-weight: bold;
+        }
+
+        .error-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .error-table th {
+            background-color: #f8d7da;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .error-table td {
+            padding: 8px;
+            border-bottom: 1px solid #f1aeb5;
+        }
+
+        .error-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .error-table tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .scrollable-errors {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .dark-mode .error-card {
+            border-color: #842029;
+        }
+
+        .dark-mode .error-card-header {
+            background-color: #842029;
+        }
+
+        .dark-mode .error-table th {
+            background-color: #2c0b0e;
+            color: #f1aeb5;
+        }
+
+        .dark-mode .error-table td {
+            border-color: #842029;
+        }
+
+        .dark-mode .error-table tr:nth-child(even) {
+            background-color: #2b3035;
+        }
+
+        .dark-mode .error-table tr:hover {
+            background-color: #343a40;
+        }
     </style>
 </head>
 
@@ -1089,6 +1154,33 @@
                 <i class="fas fa-eye me-2"></i>View Questions
             </a>
         </div>
+        {% if upload_errors %}
+        <div class="card error-card mt-4">
+            <div class="card-header error-card-header">
+                <h4 class="mb-0">Upload Errors</h4>
+            </div>
+            <div class="card-body p-0">
+                <div class="scrollable-errors">
+                    <table class="error-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Row Data</th>
+                                <th style="width: 80%;">Error Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for error in upload_errors %}
+                            <tr>
+                                <td>{{ error|slice:":100" }}</td>
+                                <td>{{ error }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <button class="theme-toggle">

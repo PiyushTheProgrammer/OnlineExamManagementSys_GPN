@@ -74,6 +74,7 @@
             color: var(--text-primary);
             line-height: 1.6;
         }
+
         /* Enhanced Body Styling */
         body {
             background: linear-gradient(135deg, var(--background) 0%, #ffffff 100%);
@@ -1095,7 +1096,9 @@
 
 <body>
     <div class="exam-container">
-        <h2 style="color:violet;"><center>Exam Portal</center></h2>
+        <h2 style="color:violet;">
+            <center>Exam Portal</center>
+        </h2>
 
         <!-- CSRF Token -->
         <input type="hidden" id="csrf_token" value="{{ csrf_token }}">
@@ -1137,17 +1140,20 @@
             </div>
         </div>
 
-        <!-- Success Modal -->
-        <div class="modal fade" id="successModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-dialog-centered">
+        <!-- Warning Modal for Tab Switching -->
+        <div class="modal fade" id="warningModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
                 <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title">Success!</h5>
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title">Warning!</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body text-center py-4">
-                        <i class="fas fa-check-circle text-success" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                        <h4>Exam Submitted Successfully!</h4>
-                        <p class="mb-0">Your answers have been recorded. You will be redirected to the results page shortly.</p>
+                    <div class="modal-body">
+                        <p id="warning-text"></p>
+                        <p class="text-danger"><strong>Please stay on this tab during your exam.</strong></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
                     </div>
                 </div>
             </div>
@@ -1218,9 +1224,18 @@
 
 
     <script>
+        let successModal, summaryModal, warningModal;
 
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initialize modals
+            successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
+            warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+
+            // Rest of your existing DOMContentLoaded code...
+        });
         // Disable right-click menu
-        document.addEventListener('contextmenu', event => event.preventDefault());
+        // document.addEventListener('contextmenu', event => event.preventDefault());
 
         // Disable keyboard shortcuts for copying, pasting, inspecting, and taking screenshots
         document.addEventListener("keydown", function (e) {
@@ -1239,17 +1254,16 @@
         // Disable text selection
         document.addEventListener('selectstart', event => event.preventDefault());
 
-        // // Prevent tab switching
+        // Prevent tab switching
         let tabSwitchCount = 0;
         document.addEventListener("visibilitychange", function () {
             if (document.hidden) {
                 tabSwitchCount++;
-
-                // Show success modal instead of alert
-                showSuccessModal();
+                alert("Tab switching detected! Stay on the exam page.");
 
                 // Auto-submit the exam if tab is switched too many times
-                if (tabSwitchCount >= 3) {
+                if (tabSwitchCount >= 30) {
+                    alert("Multiple tab switches detected! Exam will be submitted.");
                     submitExam();
                 }
             }
@@ -1304,8 +1318,50 @@
 
             // Attach button events
             attachButtonEvents();
+
+            // Initialize modals
+            // summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
+            // successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            // warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+
+            // Add click handler for summary button
+            // document.getElementById('summary-btn').addEventListener('click', showSummary);
+
+            // Initialize panel toggle
+            const toggleBtn = document.getElementById('togglePanelBtn');
+            const timePanel = document.querySelector('.time-panel');
+            const overlay = document.getElementById('panelOverlay');
+
+            function togglePanel() {
+                timePanel.classList.toggle('active');
+                overlay.classList.toggle('active');
+                const icon = toggleBtn.querySelector('i');
+                icon.classList.toggle('fa-clock');
+                icon.classList.toggle('fa-times');
+            }
+
+            toggleBtn.addEventListener('click', togglePanel);
+            overlay.addEventListener('click', togglePanel);
+
+            // Close panel when clicking outside (mobile only)
+            if (window.innerWidth <= 768) {
+                document.addEventListener('click', function (e) {
+                    if (!timePanel.contains(e.target) && !toggleBtn.contains(e.target)) {
+                        timePanel.classList.remove('active');
+                        overlay.classList.remove('active');
+                        const icon = toggleBtn.querySelector('i');
+                        icon.classList.add('fa-clock');
+                        icon.classList.remove('fa-times');
+                    }
+                });
+            }
         });
 
+        function showWarningModal(count) {
+            const warningText = document.getElementById('warning-text');
+            warningText.textContent = `Warning ${count}/3: Switching tabs is not allowed. Your exam will be auto-submitted if you switch tabs ${3 - count} more time(s).`;
+            warningModal.show();
+        }
         function initializeSideSummaryGrid() {
             const sideSummaryGrid = document.getElementById('side-summary-grid');
             sideSummaryGrid.innerHTML = ''; // Clear existing content
@@ -1359,24 +1415,37 @@
 
         // Function to load a question
         function loadQuestion(index) {
-            const question = questions[index];
-            if (!question) return;
-
-            // Update question text with number and marks
-            const questionText = document.getElementById("question-text");
-            const questionMarks = `<span class="question-marks">[${question.marks} Marks]</span>`;
-
-            // Handle LaTeX in question text
-            if (containsLatex(question.question)) {
-                questionText.innerHTML = `<strong>${index + 1}.</strong> ${question.question} ${questionMarks}`;
-            } else {
-                questionText.innerHTML = `<strong>${index + 1}.</strong> ${escapeHtml(question.question)} ${questionMarks}`;
+            // Validate input
+            if (!questions || index < 0 || index >= questions.length) {
+                console.error("Invalid question index:", index);
+                return;
             }
 
-            // Handle LaTeX equation with improved support
+            const question = questions[index];
+            if (!question) {
+                console.error("Question not found at index:", index);
+                return;
+            }
+
+            // Clear existing content
+            const questionText = document.getElementById("question-text");
             const equationDisplay = document.getElementById("equation-display");
+            const optionsContainer = document.getElementById("options-container");
+            optionsContainer.innerHTML = '';
             equationDisplay.innerHTML = '';
 
+            // Update question text with number and marks
+            const questionMarks = `<span class="question-marks">[${question.marks || 0} Marks]</span>`;
+            const questionContent = question.question_text || question.question || "Question text not available";
+
+            // Handle LaTeX in question text
+            if (containsLatex(questionContent)) {
+                questionText.innerHTML = `<strong>${index + 1}.</strong> ${questionContent} ${questionMarks}`;
+            } else {
+                questionText.innerHTML = `<strong>${index + 1}.</strong> ${escapeHtml(questionContent)} ${questionMarks}`;
+            }
+
+            // Handle LaTeX equation if present
             if (question.latex_equation) {
                 let equation = question.latex_equation.trim();
                 // Auto-wrap equation if not already wrapped
@@ -1386,13 +1455,20 @@
                 equationDisplay.innerHTML = equation;
             }
 
-            // Clear and rebuild options container
-            const optionsContainer = document.getElementById("options-container");
-            optionsContainer.innerHTML = '';
+            // Create option buttons - try both 'op1' and 'option_1' formats
+            const optionKeys = ['op1', 'op2', 'op3', 'op4', 'option_1', 'option_2', 'option_3', 'option_4'];
+            const usedKeys = optionKeys.filter(key => question[key] !== undefined);
 
-            // Create option buttons with radio buttons
-            ["op1", "op2", "op3", "op4"].forEach((key, i) => {
-                if (!question[key]) return; // Skip if option is empty
+            // Use the first format that exists (either 'op1' or 'option_1')
+            const primaryKeys = usedKeys.includes('op1') ?
+                ['op1', 'op2', 'op3', 'op4'] :
+                ['option_1', 'option_2', 'option_3', 'option_4'];
+
+            primaryKeys.forEach((key, i) => {
+                if (!question[key]) {
+                    console.warn(`Missing option ${key} for question ${question.q_id}`);
+                    return;
+                }
 
                 const optionWrapper = document.createElement("div");
                 optionWrapper.className = "option-wrapper";
@@ -1400,13 +1476,13 @@
                 const radioInput = document.createElement("input");
                 radioInput.type = "radio";
                 radioInput.name = "question-option";
-                radioInput.id = `option${i}`;
+                radioInput.id = `option${i}_${question.q_id}`;
                 radioInput.className = "option-radio";
-                radioInput.value = String.fromCharCode(65 + i);
+                radioInput.value = String.fromCharCode(65 + i); // A, B, C, D
 
                 const label = document.createElement("label");
                 label.className = "option";
-                label.htmlFor = `option${i}`;
+                label.htmlFor = `option${i}_${question.q_id}`;
 
                 // Add option letter (A, B, C, D)
                 const optionLetter = document.createElement("span");
@@ -1417,31 +1493,37 @@
                 optionText.className = "option-text";
 
                 let displayText = question[key];
-                if (question[key].includes('\\') && !question[key].startsWith('\\(')) {
-                    let latexOption = question[key].replace(/\\/g, "\\\\");
-                    displayText = `\\(${latexOption}\\)`;
-                } else if (question[key].startsWith('\\(') && question[key].endsWith('\\)')) {
-                    displayText = question[key];
+                // Handle LaTeX in options
+                if (containsLatex(displayText)) {
+                    if (!displayText.startsWith('\\(')) {
+                        displayText = `\\(${displayText}\\)`;
+                    }
+                } else {
+                    displayText = escapeHtml(displayText);
                 }
-
                 optionText.innerHTML = displayText;
-                console.log(`Option ${String.fromCharCode(65 + i)}: ${displayText}`);
 
-                optionText.innerHTML = displayText;
-                console.log(`Option ${String.fromCharCode(65 + i)}: ${displayText}`);
-
+                // Check if this option was previously selected
                 if (selectedAnswers[question.q_id] === String.fromCharCode(65 + i)) {
                     radioInput.checked = true;
                     label.classList.add("selected");
                 }
 
+                // Add click handler
                 optionWrapper.onclick = function () {
+                    // Update selected answer
                     selectedAnswers[question.q_id] = String.fromCharCode(65 + i);
+
+                    // Update UI
                     optionsContainer.querySelectorAll(".option").forEach(opt =>
                         opt.classList.remove("selected"));
                     label.classList.add("selected");
                     radioInput.checked = true;
+
+                    // Save answer to server
                     saveAnswerToServer(question.q_id, String.fromCharCode(65 + i));
+
+                    // Update summary grid
                     updateSideSummaryGrid();
                 };
 
@@ -1450,26 +1532,29 @@
                 optionWrapper.appendChild(radioInput);
                 optionWrapper.appendChild(label);
                 optionsContainer.appendChild(optionWrapper);
-            });            // Update navigation buttons
+            });
+
+            // Update navigation buttons
             document.getElementById("prev-btn").disabled = index === 0;
             document.getElementById("next-btn").disabled = index === questions.length - 1;
+
+            // Update side summary grid
+            updateSideSummaryGrid();
+
+            // Typeset with MathJax
             if (window.MathJax) {
                 MathJax.typesetPromise([questionText, equationDisplay, optionsContainer])
-                    .catch(err => console.log('MathJax typeset error:', err));
+                    .then(() => {
+                        // Update summary modal if open
+                        if (document.getElementById('summaryModal').classList.contains('show')) {
+                            showSummary();
+                        }
+                    })
+                    .catch(err => console.error('MathJax typeset error:', err));
             }
-
-            updateSideSummaryGrid();
         }
 
-            // Update summary modal if open
-            if (document.getElementById('summaryModal').classList.contains('show')) {
-                showSummary();
-            }
-
-            // Update the side summary grid
-            updateSideSummaryGrid();
-
-        // Helper functions needed for the updated version
+        // Helper function to check for LaTeX content
         function containsLatex(text) {
             if (!text) return false;
             const latexPatterns = [
@@ -1480,14 +1565,16 @@
             return latexPatterns.some(pattern => pattern.test(text));
         }
 
+        // Helper function to escape HTML
         function escapeHtml(unsafe) {
+            if (!unsafe) return '';
             return unsafe
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
-        }  // Save current question index to localStorage
+        } // Save current question index to localStorage
 
         function saveCurrentQuestionIndex(index) {
             fetch("{% url 'student:save_current_question_index' %}", {
@@ -1750,39 +1837,19 @@
             localStorage.setItem('selectedAnswers', JSON.stringify(selectedAnswers));
         }
 
-
+        function showSuccessModal() {
+            if (!successModal) {
+                // Initialize if not already done
+                successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            }
+            successModal.show();
+        }
         function submitExam() {
-            console.log("Starting exam submission process...");
 
-            // Show loading message
-            const loadingMsg = document.createElement('div');
-            loadingMsg.id = 'submit-loading';
-            loadingMsg.innerHTML = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;justify-content:center;align-items:center"><div style="background:white;padding:20px;border-radius:5px;text-align:center"><h3>Submitting Exam...</h3><p>Please wait while your answers are being processed.</p></div></div>';
-            document.body.appendChild(loadingMsg);
-
-            // Update the user_c_ans field in the JSON data
-            questions.forEach(question => {
-                if (selectedAnswers[question.q_id]) {
-                    question.user_c_ans = selectedAnswers[question.q_id];
-                    question.student_answer_text = question[`op${selectedAnswers[question.q_id].charCodeAt(0) - 64}`];
-                }
-            });
-
-            // Calculate gained marks
-            let gained_marks = 0;
-            questions.forEach(question => {
-                if (question.user_c_ans && question.user_c_ans === question.c_ans) {
-                    gained_marks += parseInt(question.marks);
-                }
-            });
-
-            // Log the data being sent
             const submitData = {
-                answers: selectedAnswers,
-                exam_id: "{{ exam.id }}",
-                gained_marks: gained_marks
+                exam_id: parseInt("{{ exam.id }}"),
+                answers: selectedAnswers
             };
-            console.log("Submitting exam with data:", submitData);
 
             fetch("{% url 'student:submit_exam' %}", {
                 method: "POST",
@@ -1801,16 +1868,12 @@
                 })
                 .then(data => {
                     console.log("Server response:", data);
-                    // Remove loading message
-                    document.getElementById('submit-loading').remove();
-
                     if (data.success) {
                         // Show success modal before redirecting
-                        showSuccessModal();
-
-                        // Redirect to the exam result page after a short delay
-                        console.log("Redirecting to:", data.redirect_url);
-                        setTimeout(function() {
+                        alert("Exam submitted successfully!");
+                        // Redirect to results page
+                        window.location.href = data.redirect_url || `/exam-result/$data.exam_id/`;
+                        setTimeout(function () {
                             window.location.href = data.redirect_url;
                         }, 3000); // 3 second delay to show the success message
                     } else {
@@ -1826,36 +1889,6 @@
                     alert("Failed to submit exam: " + error.message);
                 });
         }
-
-        // Initialize Bootstrap Modals
-        let summaryModal;
-        let successModal;
-
-        // Helper function to safely show the success modal
-        function showSuccessModal() {
-            if (document.readyState === 'complete') {
-                // If DOM is already loaded
-                if (!successModal) {
-                    successModal = new bootstrap.Modal(document.getElementById('successModal'));
-                }
-                successModal.show();
-            } else {
-                // Wait for DOM to be ready
-                document.addEventListener('DOMContentLoaded', function() {
-                    successModal = new bootstrap.Modal(document.getElementById('successModal'));
-                    successModal.show();
-                });
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            // Initialize the modals
-            summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
-            successModal = new bootstrap.Modal(document.getElementById('successModal'));
-
-            // Add click handler for summary button
-            document.getElementById('summary-btn').addEventListener('click', showSummary);
-        });
 
         function showSummary() {
             const summaryGrid = document.getElementById('summary-grid');

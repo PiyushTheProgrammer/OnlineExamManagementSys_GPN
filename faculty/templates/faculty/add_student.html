@@ -275,7 +275,11 @@
                 <label for="roll_no" class="form-label">Roll Number</label>
                 <input type="text" class="form-control" id="roll_no" name="roll_no" required placeholder="Enter roll number">
             </div>
-            
+            <select name="branch" required>
+                {% for value, label in branches %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
             <div class="mb-3">
                 <label for="course_codes" class="form-label">Select Courses</label>
                 <select multiple class="form-control" id="course_codes" name="course_codes" required>

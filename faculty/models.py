@@ -1,4 +1,3 @@
-
 from django.db import models
 from django.contrib.auth.models import User
 import json
@@ -25,21 +24,11 @@ class Course(models.Model):
         ("2nd Year", "2nd Year"),
         ("3rd Year", "3rd Year"),
     ]
-
-    BRANCH_CHOICES = [
-        ("Computer Science", "Computer Science"),
-        ("Information Technology", "Information Technology"),
-        ("Electronics", "Electronics"),
-        ("Mechanical", "Mechanical"),
-        ("Civil", "Civil"),
-    ]
-
     id = models.AutoField(primary_key=True)
     faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, null=False, blank=False)
     code = models.CharField(max_length=50,null=False, blank=False,default='123451')
     year = models.CharField(max_length=10, choices=YEAR_CHOICES, null=False, blank=False,default='first')
-    branch = models.CharField(max_length=50, choices=BRANCH_CHOICES, null=False, blank=False,default='IF')
 
     def __str__(self):
         return f"{self.name} ({self.code})"
@@ -73,8 +62,8 @@ class ExamSpecification(models.Model):
         
 class Question(models.Model):
     sr_no = models.IntegerField(null=True,blank=True)
-    course_name=models.CharField(max_length=255,null=True,blank=True)
     course_code=models.CharField(max_length=255,null=True,blank=True)
+    course_name=models.CharField(max_length=255,null=True,blank=True)
     question_text = models.TextField()
     latex_equation = models.TextField(null=True, blank=True)  # New field for LaTeX equations
     option1 = models.CharField(max_length=255,default="Option A")
@@ -89,7 +78,16 @@ class Question(models.Model):
     def __str__(self):
         return self.question_text
 
+
 class Student(models.Model):
+    BRANCH_CHOICES = [
+        ("Computer Technology", "Computer Technology"),
+        ("Information Technology", "Information Technology"),
+        ("Electronics", "Electronics"),
+        ("Mechanical", "Mechanical"),
+        ("Civil", "Civil"),
+    ]
+    branch = models.CharField(max_length=50, choices=BRANCH_CHOICES, null=False, blank=False,default='IF')
     user = models.OneToOneField(User,on_delete=models.CASCADE,null=True,blank=True)
     roll_no = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=100)

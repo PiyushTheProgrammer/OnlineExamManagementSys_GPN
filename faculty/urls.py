@@ -28,9 +28,9 @@ urlpatterns = [
     path('view-students/', views.view_students, name='view_students'),
     path('truncate_students/',views.truncate_students,name='truncate_students'),
     path('update-student-password/', views.update_student_password, name='update_student_password'),
-path('reset-student-password/', views.reset_student_password, name='reset_student_password'),
-path('save-attendance/', views.save_attendance, name='save_attendance'),
-path('update_attendance',views.update_attendance,name='update_attendance'),
+    path('reset-student-password/', views.reset_student_password, name='reset_student_password'),
+    path('save-attendance/', views.save_attendance, name='save_attendance'),
+    path('update_attendance',views.update_attendance,name='update_attendance'),
     # Question management
     path('upload_questions/', views.upload_questions, name='upload_questions'),
     path('questions/', views.manage_questions, name='manage_questions'),
@@ -44,6 +44,8 @@ path('update_attendance',views.update_attendance,name='update_attendance'),
     path('exam_data',views.exam_data,name='exam_data'),
     #result display
     path('view-results/', views.view_results, name='view_results'),
+    path('api/get-pending-students/', views.get_pending_students, name='get_pending_students'),
+    path('api/get-exam-stats/', views.get_exam_stats, name='get_exam_stats'),
     # force logout
     path('force-logout/<str:roll_no>/', views.force_logout, name='force_logout'),
     ]

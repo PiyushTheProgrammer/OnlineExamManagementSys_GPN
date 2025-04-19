@@ -151,7 +151,7 @@ def welcome(request):
     registered_courses = student.registered_courses.all()
     # Fetch the branch (assuming the branch is stored in the Course model)
     # If the student is registered in multiple courses, pick the first one or handle accordingly
-    branch = registered_courses.first().branch if registered_courses.exists() else "N/A"
+    branch = student.branch
           # Fetch scheduled exams for the student's registered courses
     scheduled_exams = ExamSpecification.objects.filter(
         course_code__in=[course.code for course in registered_courses],
@@ -223,6 +223,7 @@ def start_exam(request, exam_id):
             student_data = json.load(json_file)
 
         questions = student_data.get("Question_Bank", [])
+        print(questions)
         if not questions:
             messages.error(request, "No questions found in the question bank.")
             return redirect("student:welcome")
@@ -233,16 +234,16 @@ def start_exam(request, exam_id):
         for q in questions:
             formatted_questions.append({
                 "q_id": q["q_id"],
-                "question": q["question"],
+                "question_text": q["question_text"],
                 "latex_equation": q.get("latex_equation", ""),
-                "op1": q["op1"],
-                "op2": q["op2"],
-                "op3": q["op3"],
-                "op4": q["op4"],
+                "option_1": q["option_1"],
+                "option_2": q["option_2"],
+                "option_3": q["option_3"],
+                "option_4": q["option_4"],
                 "marks": q["marks"]
             })
-            if "user_c_ans" in q and q["user_c_ans"]:
-                previous_answers[str(q["q_id"])] = q["user_c_ans"]
+            if "student_c_ans" in q and q["student_c_ans"]:
+                previous_answers[str(q["q_id"])] = q["student_c_ans"]
 
         # Ensure time_remaining is properly set (double-check)
         if student.time_remaining is None or student.time_remaining <= 0:
@@ -314,8 +315,10 @@ def get_current_question_index(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
 
-# Submit Exam
-# @login_required
+import logging
+from django.db import transaction, IntegrityError
+
+@login_required
 def submit_exam(request):
     if request.method == "POST":
         try:
@@ -356,20 +359,26 @@ def submit_exam(request):
             for question in student_data["Question_Bank"]:
                 q_id = str(question["q_id"])
                 if q_id in selected_answers:
-                    question["user_c_ans"] = selected_answers[q_id]
+                    question["student_c_ans"] = selected_answers[q_id]
                     # Update student_answer_text based on the selected answer
                     if selected_answers[q_id] == "A":
-                        question["student_answer_text"] = question["op1"]
+                        question["student_answer_text"] = question["option_1"]
                     elif selected_answers[q_id] == "B":
-                        question["student_answer_text"] = question["op2"]
+                        question["student_answer_text"] = question["option_2"]
                     elif selected_answers[q_id] == "C":
-                        question["student_answer_text"] = question["op3"]
+                        question["student_answer_text"] = question["option_3"]
                     elif selected_answers[q_id] == "D":
-                        question["student_answer_text"] = question["op4"]
+                        question["student_answer_text"] = question["option_4"]
 
-                    # Calculate gained marks if the answer is correct
-                    if selected_answers[q_id] == question["c_ans"]:
-                        gained_marks += int(question["marks"])
+                    # Calculate gained marks - CORRECTED LOGIC
+                    correct_answer = question["correct_answer"]
+                    user_answer = selected_answers[q_id]
+                    if user_answer:  # Only check if answer was attempted
+                        if (user_answer == "A" and correct_answer == question["option_1"]) or \
+                           (user_answer == "B" and correct_answer == question["option_2"]) or \
+                           (user_answer == "C" and correct_answer == question["option_3"]) or \
+                           (user_answer == "D" and correct_answer == question["option_4"]):
+                            gained_marks += int(question["marks"])
 
             # Write the updated JSON back to the file
             with open(student_json_file, 'w') as json_file:
@@ -379,130 +388,119 @@ def submit_exam(request):
             student.has_attempted_exam = True
             student.save()
 
-            # Save the result in the Result model
-            Result.objects.create(
-                student=student,
-                exam=exam,
-                total_marks=exam.total_marks,  # Use total marks from ExamSpecification
-                obtained_marks=gained_marks,
-                percentage=(gained_marks / exam.total_marks) * 100 if exam.total_marks > 0 else 0
-            )
-
-
             exam_details = student_data["Exam_Details"]
             assigned_questions = student_data["Question_Bank"]
 
-                # Fetch total marks from ExamSpecification
-            total_marks_exam = exam.total_marks  # Total marks for the exam
-            total_marks_student = 0  # Total marks obtained by the student
-            gained_marks = 0  # Marks gained by the student
-            question_list = []
-            
+            # Calculate total marks and percentage
+            total_marks_exam = exam.total_marks
+            percentage = (gained_marks / total_marks_exam) * 100 if total_marks_exam > 0 else 0
+            passing_percentage = 40
+            status = "Pass" if percentage >= passing_percentage else "Fail"
 
+            # Prepare detailed question data
+            question_list = []
             for q in assigned_questions:
                 question_mark = int(q["marks"])
-                total_marks_student += question_mark
-
-                # Get user's answer (if attempted)
-                user_answer = q.get("user_c_ans", "")
-
-                # Get the answer text based on user's selection
+                user_answer = q.get("student_c_ans", "")
+                
                 student_answer_text = "Not Attempted"
                 if user_answer:
                     if user_answer == "A":
-                        student_answer_text = q["op1"]
+                        student_answer_text = q["option_1"]
                     elif user_answer == "B":
-                        student_answer_text = q["op2"]
+                        student_answer_text = q["option_2"]
                     elif user_answer == "C":
-                        student_answer_text = q["op3"]
+                        student_answer_text = q["option_3"]
                     elif user_answer == "D":
-                        student_answer_text = q["op4"]
+                        student_answer_text = q["option_4"]
 
-                # Calculate marks if answer is correct
+                # Correct answer check - same logic as above
+                correct_answer = q["correct_answer"]
+                is_correct = False
                 if user_answer:  # Only check if answer was attempted
-                    correct_answer = q["c_ans"]
-                    if user_answer == "A" and correct_answer == q["op1"] or \
-                        user_answer == "B" and correct_answer == q["op2"] or \
-                        user_answer == "C" and correct_answer == q["op3"] or \
-                        user_answer == "D" and correct_answer == q["op4"]:
-                        gained_marks += question_mark
+                    is_correct = (user_answer == "A" and correct_answer == q["option_1"]) or \
+                                (user_answer == "B" and correct_answer == q["option_2"]) or \
+                                (user_answer == "C" and correct_answer == q["option_3"]) or \
+                                (user_answer == "D" and correct_answer == q["option_4"])
 
-                # Append question data
                 question_list.append({
-                    "question_id": q["q_id"],
-                    "question_text": q["question"],
-                    "latex_equation": q.get("latex_equation", ""),  # Add LaTeX equation field
-                    "option_a": q["op1"],
-                    "option_b": q["op2"],
-                    "option_c": q["op3"],
-                    "option_d": q["op4"],
-                    "correct_answer": q["c_ans"],
-                    "student_answer": q.get("user_c_ans", "Not Attempted"),
-                    "student_answer_text": q.get("student_answer_text", "Not Attempted"),
-                   "is_correct": user_answer and student_answer_text == correct_answer
+                    "q_id": q["q_id"],
+                    "question_text": q["question_text"],
+                    "latex_equation": q.get("latex_equation", ""),
+                    "option_1": q["option_1"],
+                    "option_2": q["option_2"],
+                    "option_3": q["option_3"],
+                    "option_4": q["option_4"],
+                    "correct_answer": q["correct_answer"],
+                    "student_answer": user_answer if user_answer else "Not Attempted",
+                    "student_answer_text": student_answer_text,
+                    "is_correct": is_correct
                 })
-            # Calculate percentage based on total marks from ExamSpecification
-            percentage = (gained_marks / total_marks_exam) * 100 if total_marks_exam > 0 else 0
-            passing_percentage = 40  # You can make this configurable
-            status = "Pass" if percentage >= passing_percentage else "Fail"
-                # Prepare the result data for download
-            result_data = {
-                    "student_name": exam_details["student_name"],
-                    "roll_no": exam_details["roll_no"],
-                    "course_name": exam_details["c_name"],
-                    "course_code": exam_details["c_code"],
-                    "branch": exam_details["branch"],
-                    "year": exam_details["year"],
-                    "total_questions": exam_details["m_question"],
-                    "attempted_questions": len([q for q in assigned_questions if q.get("user_c_ans")]),
-                    "total_marks": total_marks_exam,  # Use total marks from ExamSpecification
-                    "gained_marks": gained_marks,
-                    "percentage": round(percentage, 2),
-                    "question_list": question_list
-                }
 
-                # Save the result in the Result model
-            # Save or update the result in the Result model
-            result, created = Result.objects.update_or_create(
-                student=student,
-                exam=exam,
-                defaults={
+            # Prepare the complete result data
+            result_data = {
+                "student_name": exam_details["student_name"],
+                "roll_no": exam_details["roll_no"],
+                "course_name": exam_details["course_name"],
+                "course_code": exam_details["course_code"],
+                "branch": exam_details["branch"],
+                "year": exam_details["year"],
+                "total_questions": exam_details["max_question"],
+                "attempted_questions": len([q for q in assigned_questions if q.get("student_c_ans")]),
+                "total_marks": total_marks_exam,
+                "gained_marks": gained_marks,
+                "percentage": round(percentage, 2),
+                "status": status,
+                "question_list": question_list,
+                "result_summary": {
                     "total_marks": total_marks_exam,
                     "obtained_marks": gained_marks,
-                    "percentage": percentage,
+                    "percentage": round(percentage, 2),
+                    "status": status,
+                    "passing_percentage": passing_percentage
                 }
-            )
+            }
+
+            # Update existing Result object (don't create new one)
+            result = Result.objects.filter(student=student, exam=exam).first()
+            if result:
+                result.obtained_marks = gained_marks
+                result.percentage = percentage
+                result.status = status
+                result.submitted_at = timezone.now()
+                result.save()
+            else:
+                # Fallback in case result doesn't exist (shouldn't happen)
+                result = Result.objects.create(
+                    student=student,
+                    exam=exam,
+                    total_marks=total_marks_exam,
+                    obtained_marks=gained_marks,
+                    percentage=percentage,
+                    status=status
+                )
 
             # Save the result JSON file
             folder_path = "C:/Data/"
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
+            os.makedirs(folder_path, exist_ok=True)
+            
             file_path = os.path.join(folder_path, f"{student.roll_no}({exam.exam_name}).json")
             with open(file_path, "w", encoding="utf-8") as json_file:
                 json.dump(result_data, json_file, indent=4, ensure_ascii=False)
 
-            # Return success response
-            return JsonResponse({"success": True, "redirect_url": reverse("student:exam_result", args=[exam_id])})
+                 # Return success response
+            return JsonResponse({
+                "success": True,
+                "message": "Exam submitted successfully.",
+                "result": result_data,
+                "exam_id": exam.id,
+                "redirect_url": reverse('student:exam_result', kwargs={'exam_id': exam.id})
+            }, status=200)
 
-        except FileNotFoundError:
-            return JsonResponse({
-                "success": False,
-                "error": f"Exam file not found: {student_json_file}"
-            }, status=404)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                "success": False,
-                "error": "Invalid exam data format."
-            }, status=400)
         except Exception as e:
-            return JsonResponse({
-                "success": False,
-                "error": f"Error processing exam: {str(e)}"
-            }, status=500)
-
+            return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+    
     return JsonResponse({"error": "Invalid request method"}, status=405)
-
 # Save Remaining Time
 @csrf_exempt  # Exempt this view from CSRF verification
 def save_remaining_time(request):
@@ -579,33 +577,33 @@ def exam_result(request, exam_id):
         total_marks_student += question_mark
 
         # Get user's answer (if attempted)
-        user_answer = q.get("user_c_ans", "")
+        user_answer = q.get("student_c_ans", "")
 
         # Get the answer text based on user's selection
         user_answer_text = "Not Attempted"
         if user_answer:
             if user_answer == "A":
-                user_answer_text = q["op1"]
+                user_answer_text = q["option_1"]
             elif user_answer == "B":
-                user_answer_text = q["op2"]
+                user_answer_text = q["option_2"]
             elif user_answer == "C":
-                user_answer_text = q["op3"]
+                user_answer_text = q["option_3"]
             elif user_answer == "D":
-                user_answer_text = q["op4"]
+                user_answer_text = q["option_4"]
 
         # Calculate marks if answer is correct
         if user_answer:  # Only check if answer was attempted
-            correct_answer = q["c_ans"]
-            if user_answer == "A" and correct_answer == q["op1"] or \
-               user_answer == "B" and correct_answer == q["op2"] or \
-               user_answer == "C" and correct_answer == q["op3"] or \
-               user_answer == "D" and correct_answer == q["op4"]:
+            correct_answer = q["correct_answer"]
+            if user_answer == "A" and correct_answer == q["option_1"] or \
+               user_answer == "B" and correct_answer == q["option_2"] or \
+               user_answer == "C" and correct_answer == q["option_3"] or \
+               user_answer == "D" and correct_answer == q["option_4"]:
                 gained_marks += question_mark
 
         # Append question data
         question_list.append({
-            "question_text": q["question"],
-            "correct_answer": q["c_ans"],
+            "question_text": q["question_text"],
+            "correct_answer": q["correct_answer"],
             "attempted_answer": user_answer_text,
             "marks": question_mark,
             "is_correct": user_answer and user_answer == correct_answer  # Add this field
@@ -619,12 +617,12 @@ def exam_result(request, exam_id):
         "student_name": exam_details["student_name"],
         "roll_no": exam_details["roll_no"],
         "exam_type":exam_details["exam_type"],
-        "course_name": exam_details["c_name"],
-        "course_code": exam_details["c_code"],
+        "course_name": exam_details["course_name"],
+        "course_code": exam_details["course_code"],
         "branch": exam_details["branch"],
         "year": exam_details["year"],
-        "total_questions": exam_details["m_question"],
-        "attempted_questions": len([q for q in assigned_questions if q.get("user_c_ans")]),
+        "total_questions": exam_details["max_question"],
+        "attempted_questions": len([q for q in assigned_questions if q.get("student_c_ans")]),
         "total_marks": total_marks_exam,  # Use total marks from ExamSpecification
         "gained_marks": gained_marks,
         "percentage": round(percentage, 2),
@@ -696,7 +694,7 @@ def save_answer(request):
             # Update the answer in the Question_Bank
             for question in student_data["Question_Bank"]:
                 if str(question["q_id"]) == str(question_id):
-                    question["user_c_ans"] = answer
+                    question["student_c_ans"] = answer
                     break
 
             # Write the updated JSON back to the file
@@ -732,8 +730,8 @@ def get_saved_answers(request):
             # Extract saved answers
             answers = {}
             for question in student_data["Question_Bank"]:
-                if "user_c_ans" in question and question["user_c_ans"]:
-                    answers[str(question["q_id"])] = question["user_c_ans"]
+                if "student_c_ans" in question and question["student_c_ans"]:
+                    answers[str(question["q_id"])] = question["student_c_ans"]
 
             return JsonResponse({'success': True, 'answers': answers})
         except Exception as e:

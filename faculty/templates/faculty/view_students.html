@@ -184,13 +184,7 @@
                             <tr>
                                 <td>{{ student.roll_no }}</td>
                                 <td>{{ student.name }}</td>
-                                <td>
-                                    {% if student.registered_courses.exists %}
-                                        {{ student.registered_courses.first.branch }}
-                                    {% else %}
-                                        N/A
-                                    {% endif %}
-                                </td>
+                                <td>{{ student.branch }}</td>
                                 <td>
                                     <div class="input-group password-input-group">
                                         <input type="password" class="form-control student-password"

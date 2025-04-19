@@ -8,6 +8,33 @@
     <title>Exam Results</title>
     <link rel="icon" href="{% static 'faculty/images/favicon.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <!-- Add MathJax support -->
+    <script>
+        // Update MathJax configuration to handle more formats
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true,
+                packages: { '[+]': ['ams', 'color', 'boldsymbol'] }
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            loader: {
+                load: ['[tex]/ams', '[tex]/color', '[tex]/boldsymbol']
+            },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    MathJax.typesetPromise();
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
             --primary-blue: #004080;
@@ -143,7 +170,41 @@
             font-weight: bold;
             border-left: 3px solid var(--accent-yellow);
         }
+        .MathJax {
+            outline: none !important;
+            font-size: 1.1em !important;
+            line-height: 1.4 !important;
+        }
 
+        .MathJax_Display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            margin: 1em 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .equation-container {
+            padding: 15px;
+            margin: 15px 0;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #004080;
+            overflow-x: auto;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .MathJax_Preview {
+            display: none !important;
+        }
+
+        /* Add specific styling for math in question breakdown */
+        .table td .MathJax {
+            display: inline !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         /* Final submission card styles */
         .card {
             background:white;
@@ -465,9 +526,16 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Typeset the math when the page loads
+            if (window.MathJax) {
+                MathJax.typesetPromise().catch((err) => console.error('MathJax typeset error:', err));
+            }
+        });
         function redirectToPage() {
             window.location.href = "exam_result.html";
         }
+
     </script>
 </body>
 
