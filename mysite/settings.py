@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'faculty.middleware.ErrorHandlerMiddleware',
+    'student.middleware.NoCacheMiddleware',
 ]
 SESSION_ENGINE = 'django.contrib.sessions.backends.db' 
 SESSION_COOKIE_AGE = 86400  # 1 day
@@ -99,14 +100,6 @@ DATABASES = {
         'PORT': '3306',
     }
 }
-# Install python-dotenv: pip install python-dotenv
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
