@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'faculty.middleware.ErrorHandlerMiddleware',
+    'student.middleware.NoCacheMiddleware',
 ]
 SESSION_ENGINE = 'django.contrib.sessions.backends.db' 
 SESSION_COOKIE_AGE = 86400  # 1 day

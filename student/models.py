@@ -8,3 +8,4 @@ class StudentPermissions(models.Model):
             ("can_start_exma", "Can start exam"),
             ("can_submit_exam","Can submit exam"),
         ]
+

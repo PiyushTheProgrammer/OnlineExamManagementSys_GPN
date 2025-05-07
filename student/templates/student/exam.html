@@ -1506,7 +1506,8 @@
             optionsContainer.innerHTML = '';
             equationDisplay.innerHTML = '';
 
-            const questionUnit = `<span class="question-unit">[Unit: ${question.unit_no || 'N/A'} ]</span>`;
+            // const questionUnit = `<span class="question-unit">[CO: ${question.unit_no || 'N/A'} ]</span>`;
+            const questionUnit = `<span class="question-unit">[CO: ${question.unit_no || 'N/A'}, Marks: ${question.marks || 'N/A'}]</span>`;
             const questionContent = question.question_text || question.question || "Question text not available";
 
             if (containsLatex(questionContent)) {

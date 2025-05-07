@@ -312,16 +312,24 @@ def add_course(request):
         course_name = request.POST.get('name')
         course_code = request.POST.get('code')
         year = request.POST.get('year')
+        
+        print(course_name,course_code)
 
-        Course.objects.create(
+        # Check if the course already exists
+        if Course.objects.filter(name=course_name, code=course_code, faculty=faculty).exists():
+            messages.error(request, "Course with this name and code already exists!")
+
+        else:
+            Course.objects.create(
             name=course_name,
             code=course_code,
             year=year,
             faculty=faculty
-        )
+            )
 
-        messages.success(request, "Course added successfully!")
-        return redirect('add_course')
+            messages.success(request, "Course added successfully!")
+            return redirect('add_course')
+       
 
     return render(request, 'faculty/add_course.html',{'courses':courses})
 
@@ -383,59 +391,143 @@ def add_exam_specifications(request):
     courses = Course.objects.all()
 
     if request.method == "POST":
-        exam_name = request.POST.get("exam_name")
-        exam_type = request.POST.get("exam_type")
-        num_units = int(request.POST.get("num_units"))
-        course_code = request.POST.get('course_code','').strip()
-        total_marks = int(request.POST.get("total_marks", 0))  # Add total marks
-        total_questions = int(request.POST.get("total_questions", 0))  # Add total questions
-        marks_per_unit_str = request.POST.get("marks_per_unit", "")  # Get marks per unit as a string
-        max_mark = int(request.POST.get("max_mark", 1))  # Add max mark
-        duration_hours = request.POST.get("duration_hours")
-        duration_minutes=request.POST.get("duration_minutes")
-
         try:
+            # Get and validate basic fields
+            exam_name = request.POST.get("exam_name", "").strip()
+            if not exam_name:
+                raise ValueError("Exam name is required")
+                
+            exam_type = request.POST.get("exam_type", "").strip()
+            if not exam_type:
+                raise ValueError("Exam type is required")
+
+            # Validate course
+            course_code = request.POST.get('course_code', '').strip()
+            if not course_code:
+                raise ValueError("Course code is required")
             course = Course.objects.get(code=course_code)
 
-         # Convert the question sheet string to JSON
-            question_sheet_str = request.POST.get('question_sheet', '')
-            question_sheet = []
+            # Check for duplicate exam specification
+            if ExamSpecification.objects.filter(
+                faculty=faculty,
+                course_code=course_code,
+                exam_name=exam_name
+            ).exists():
+                raise ValueError(f"Exam specification '{exam_name}' already exists for {course_code}")
 
-                # Parse the pipe-separated string into JSON format
-            for unit_str in question_sheet_str.split('|'):
-                if not unit_str:
-                    continue
-                unit_part = unit_str.split(':')
-                unit_num = int(unit_part[0].replace('Unit-', ''))
-                questions = [int(mark) for mark in unit_part[1].split(',') if mark.strip()]
-
-                question_sheet.append({
-                    'unit': unit_num,
-                    'questions': questions,
-                    'totalMarks': sum(questions)
-                })
-
-            print("exam name",exam_name)
-            print("exam type",exam_type)
-            print("num_units",num_units)
-            print("course_code",course_code)
-            print("total_marks",total_marks)
-            print("total_questions",total_questions)
-            print("marks_per_unit_str",marks_per_unit_str)
-
-            # Parse marks_per_unit from the comma-separated string
+            # Validate numeric fields
             try:
-                marks_per_unit = [int(mark.strip()) for mark in marks_per_unit_str.split(",")]
+                num_units = int(request.POST.get("num_units", 0))
+                if num_units <= 0:
+                    raise ValueError("Number of units must be positive")
             except ValueError:
-                messages.error(request, "Invalid marks per unit format. Please enter comma-separated values.")
-                return render(request, "faculty/add_exam_specifications.html", {'specifications': specifications})
+                raise ValueError("Number of units must be a whole number (integer)")
 
-        # Validate the number of units
+            try:
+                total_marks = int(request.POST.get("total_marks", 0))
+                if total_marks <= 0:
+                    raise ValueError("Total marks must be positive")
+            except ValueError:
+                raise ValueError("Total marks must be a whole number (integer)")
+
+            try:
+                total_questions = int(request.POST.get("total_questions", 0))
+                if total_questions <= 0:
+                    raise ValueError("Total questions must be positive")
+            except ValueError:
+                raise ValueError("Total questions must be a whole number (integer)")
+
+            try:
+                max_mark = int(request.POST.get("max_mark", 1))
+                if max_mark <= 0:
+                    raise ValueError("Max mark must be positive")
+            except ValueError:
+                raise ValueError("Max mark must be a whole number (integer)")
+
+            # Validate duration fields
+            try:
+                duration_hours = int(request.POST.get("duration_hours", 0))
+                if duration_hours < 0:
+                    raise ValueError("Hours must be 0 or positive")
+            except ValueError:
+                raise ValueError("Hours must be a whole number (integer)")
+
+            try:
+                duration_minutes = int(request.POST.get("duration_minutes", 0))
+                if not (0 <= duration_minutes < 60):
+                    raise ValueError("Minutes must be between 0 and 59")
+            except ValueError:
+                raise ValueError("Minutes must be a whole number (integer)")
+
+            # Strict validation for marks per unit (integer only)
+            marks_per_unit_str = request.POST.get("marks_per_unit", "").strip()
+            if not marks_per_unit_str:
+                raise ValueError("Marks per unit are required")
+
+            try:
+                # Check for any float values by trying to convert to float first
+                if any('.' in mark.strip() for mark in marks_per_unit_str.split(",")):
+                    raise ValueError("Marks must be whole numbers (no decimals allowed)")
+                
+                marks_per_unit = [int(mark.strip()) for mark in marks_per_unit_str.split(",")]
+                
+                if any(mark <= 0 for mark in marks_per_unit):
+                    raise ValueError("All unit marks must be positive")
+            except ValueError as e:
+                raise ValueError(f"Invalid marks per unit: {str(e)}")
+
             if len(marks_per_unit) != num_units:
-                messages.error(request, "Number of units does not match the provided unit marks.")
-                return render(request, "faculty/add_exam_specifications.html", {'specifications': specifications})
+                raise ValueError(f"Expected marks for {num_units} units, got {len(marks_per_unit)}")
 
-        # Create the exam specification
+            # Validate question sheet with max 8 marks per question
+            question_sheet_str = request.POST.get('question_sheet', '').strip()
+            if not question_sheet_str:
+                raise ValueError("Question sheet is required")
+
+            question_sheet = []
+            for unit_str in question_sheet_str.split('|'):
+                if not unit_str.strip():
+                    continue
+                    
+                try:
+                    unit_part = unit_str.split(':')
+                    if len(unit_part) != 2:
+                        raise ValueError("Invalid format (expected 'Unit-X:marks,...')")
+                        
+                    unit_num = int(unit_part[0].replace('Unit-', ''))
+                    if unit_num <= 0 or unit_num > num_units:
+                        raise ValueError(f"Unit number must be between 1 and {num_units}")
+
+                    questions = []
+                    for mark in unit_part[1].split(','):
+                        mark = mark.strip()
+                        if not mark:
+                            continue
+                            
+                        # Check for float values
+                        if '.' in mark:
+                            raise ValueError("Question marks must be whole numbers (no decimals)")
+                            
+                        question_mark = int(mark)
+                        if question_mark <= 0:
+                            raise ValueError("Question marks must be positive")
+                        if question_mark > 8:
+                            raise ValueError(f"Maximum allowed mark per question is 8 (found {question_mark})")
+                            
+                        questions.append(question_mark)
+
+                    if not questions:
+                        raise ValueError(f"No valid questions provided for Unit-{unit_num}")
+
+                    question_sheet.append({
+                        'unit': unit_num,
+                        'questions': questions,
+                        'totalMarks': sum(questions)
+                    })
+                except ValueError as e:
+                    raise ValueError(f"Invalid question in {unit_str}: {str(e)}")
+
+            # Create the exam specification
             exam = ExamSpecification.objects.create(
                 exam_name=exam_name,
                 exam_type=exam_type,
@@ -451,10 +543,8 @@ def add_exam_specifications(request):
                 exam_duration_minutes=duration_minutes,
             )
 
-
-            # NEW: Create Result objects for all students registered in this course
+            # Create Result objects for students
             students = Student.objects.filter(registered_courses=course)
-            
             for student in students:
                 Result.objects.create(
                     student=student,
@@ -462,15 +552,23 @@ def add_exam_specifications(request):
                     total_marks=exam.total_marks,
                     obtained_marks=0,
                     percentage=0.0,
-                    submitted_at=None  # Will be set when student submits
+                    submitted_at=None
                 )
 
-            messages.success(request, "Exam details saved successfully!")
+            messages.success(request, "Exam specifications saved successfully!")
             return redirect("preview_exam", exam_id=exam.id)
 
+        except Course.DoesNotExist:
+            messages.error(request, f"Error: Course {course_code} does not exist")
+        except ValueError as e:
+            messages.error(request, f"Validation Error: {str(e)}")
         except Exception as e:
-            messages.error(request, f'Error saving specifications: {str(e)}')
-    return render(request, "faculty/add_exam_specifications.html", {'specifications': specifications,'courses':courses})
+            messages.error(request, f"Error: {str(e)}")
+
+    return render(request, "faculty/add_exam_specifications.html", {
+        'specifications': specifications,
+        'courses': courses
+    })
     
 @login_required
 @user_passes_test(is_faculty, login_url='/faculty_login/')
@@ -781,7 +879,7 @@ def upload_questions(request):
             error_messages = []
 
             if not csv_file.name.endswith('.csv'):
-                messages.error(request, '❌ Please upload a valid CSV file.')
+                messages.error(request, '❌ Please upload a valid CSV file with .csv extension.')
                 return redirect('upload_questions')
 
             try:
@@ -794,22 +892,52 @@ def upload_questions(request):
 
                 reader = csv.reader(decoded_file)
                 next(reader, None)  # Skip header row
+                
                 for row_num, row in enumerate(reader, start=2):
                     try:
+                        # Check for empty row
+                        if not any(row):
+                            continue
+                            
                         # Check for at least 11 columns
                         if len(row) < 11:
-                            raise ValueError("Insufficient no. of columns in CSV. Please check your file.")
+                            raise ValueError("Each row must have at least 11 columns. Please check your CSV format.")
 
                         # Unpack first 11 columns
-                        sr_no, code, name, question_text, option1, option2, option3, option4, correct_answer, user_c_answer, mark = [
-                            col.strip() for col in row[:11]
-                        ]
+                        try:
+                            sr_no, code, name, question_text, option1, option2, option3, option4, correct_answer, user_c_answer, mark = [
+                                col.strip() for col in row[:11]
+                            ]
+                        except ValueError as e:
+                            raise ValueError("Missing required columns in row. Please check your CSV format.")
+
+                        # Validate required fields
+                        if not all([sr_no, code, name, question_text]):
+                            raise ValueError("Missing required fields (SR No, Course Code, Course Name, or Question Text).")
+
+                        if not all([option1, option2, option3, option4]):
+                            raise ValueError("All four options must be provided.")
+
+                        # if correct_answer not in ['1', '2', '3', '4']:
+                        #     raise ValueError("Correct answer must be 1, 2, 3, or 4 indicating the option number.")
+
+                        # Validate numeric fields
+                        try:
+                            int(sr_no)
+                            int(mark)
+                        except ValueError:
+                            raise ValueError("SR No and Mark must be numeric values.")
 
                         # Set unit_no (default to '1' if not present)
                         if len(row) > 11:
-                            unit_no = row[11].strip()
+                            unit_no = row[11].strip() or '1'  # Default to '1' if empty
                         else:
                             unit_no = '1'  # Default value
+
+                        try:
+                            int(unit_no)
+                        except ValueError:
+                            raise ValueError("Unit number must be a numeric value.")
 
                         # Set image_path (optional)
                         image_path = None
@@ -818,13 +946,13 @@ def upload_questions(request):
                             if image_name:
                                 image_path = f"media/questions/{image_name}"
 
-                        # Auto-create course if missing
-                        course, created = Course.objects.get_or_create(
-                            code=code,
-                            name=name,
-                            faculty=faculty,
-                            defaults={'description': 'Auto-created during upload'}
-                        )
+                        # Check if course exists and belongs to faculty
+                        try:
+                            course = Course.objects.get(code=code)
+                            if course.faculty != faculty:
+                                raise ValueError(f"Course with code {code} exists but is not assigned to you.")
+                        except Course.DoesNotExist:
+                            raise ValueError(f"Course with code {code} does not exist. Please add the course first before uploading questions.")
 
                         # Create the question
                         Question.objects.create(
@@ -844,19 +972,22 @@ def upload_questions(request):
                         )
 
                     except Exception as e:
-                        error_messages.append(f"Error in row {row_num}: {str(e)}")
+                        error_messages.append(f"Row {row_num}: {str(e)}")
                         continue
 
                 if error_messages:
                     request.session['upload_errors'] = error_messages
-                    messages.error(request, "❌ Some questions failed to upload")
+                    messages.error(request, f"❌ {len(error_messages)} question(s) failed to upload. See details below.")
                 else:
                     messages.success(request, "✅ All questions uploaded successfully!")
 
                 return redirect('upload_questions')
 
+            except csv.Error as e:
+                messages.error(request, f"❌ CSV file error: {str(e)}. Please check your file format.")
+                return redirect('upload_questions')
             except Exception as e:
-                messages.error(request, f"❌ File processing error: {str(e)}")
+                messages.error(request, f"❌ Unexpected error processing file: {str(e)}")
                 return redirect('upload_questions')
 
     # Get errors from session if they exist
@@ -865,7 +996,7 @@ def upload_questions(request):
     return render(request, 'faculty/upload_questions.html', {
         'form': CSVUploadForm(),
         'upload_errors': upload_errors,
-        'courses':courses
+        'courses': courses
     })
 
 import logging
@@ -1049,7 +1180,7 @@ def preview_exam(request, exam_id):
     }
 
     return render(request, "faculty/preview_exam.html", context)
-# View results view
+
 @login_required
 @user_passes_test(is_faculty)
 def take_exam(request):
@@ -1058,50 +1189,104 @@ def take_exam(request):
     
     faculty = request.user.faculty
     exams = ExamSpecification.objects.filter(faculty=faculty).order_by('-id')
-    active_exams = exams.filter(is_active=True)  # Get active exams separately
 
     if request.method == "POST":
         exam_id = request.POST.get("exam_id")
-        if exam_id:
+        if not exam_id:
+            messages.error(request, "❌ Please select a valid exam.")
+            return redirect("take_exam")
+            
+        try:
+            exam = ExamSpecification.objects.get(id=exam_id, faculty=faculty)
+            course = Course.objects.filter(code=exam.course_code).first()
+            
+            if not course:
+                messages.error(request, "❌ No course found for this exam! Please check the course configuration.")
+                return redirect("take_exam")
+            
+            # Check for sufficient questions
+            total_required_questions = sum(len(unit['questions']) for unit in exam.question_sheet)
+            available_questions = Question.objects.filter(course_code=exam.course_code).count()
+            
+            if available_questions < total_required_questions:
+                messages.error(
+                    request,
+                    f"❌ Insufficient questions available! "
+                    f"Required: {total_required_questions}, Available: {available_questions}. "
+                    "Please add more questions before starting the exam."
+                )
+                return redirect("take_exam")
+            
+            # Get registered students
+            students = Student.objects.filter(registered_courses=course)
+            if not students.exists():
+                messages.error(request, f"❌ No students registered for course {exam.course_code}! Please register students first.")
+                return redirect("take_exam")
+            
+            # Prepare exam directory
+            exam_directory = os.path.join("C:\\", f"exam_{exam_id}_{exam.exam_name.replace(' ', '_')}")
             try:
-                exam = ExamSpecification.objects.get(id=exam_id, faculty=faculty)
-                course = Course.objects.filter(code=exam.course_code).first()
-                
-                if not course:
-                    messages.error(request, "No course found for this exam!")
-                    return redirect("take_exam")
-                
-                students = Student.objects.filter(registered_courses=course)
-                exam_directory = os.path.join("C:\\", f"exam_{exam_id}_{exam.exam_name.replace(' ', '_')}")
-                
                 if not os.path.exists(exam_directory):
-                    try:
-                        os.makedirs(exam_directory)
-                    except OSError as e:
-                        messages.error(request, f"Could not create exam directory: {str(e)}")
-                        return redirect("take_exam")
+                    os.makedirs(exam_directory)
+                    messages.info(request, f"ℹ️ Created new exam directory at {exam_directory}")
+                existing_files = [f for f in os.listdir(exam_directory) if f.endswith('.json')]
+            except OSError as e:
+                messages.error(request, f"❌ Failed to create exam directory: {str(e)}")
+                return redirect("take_exam")
+            
+            # Separate students who need JSON files
+            students_without_json = [s for s in students if f"{s.roll_no}.json" not in existing_files]
+            
+            # Track generation results
+            success_count = 0
+            failure_count = 0
+            error_details = []
+            
+            if students_without_json:
+                # Process manually added students first
+                manually_added = [s for s in students_without_json if s.is_manually_added]
+                regular_students = [s for s in students_without_json if not s.is_manually_added]
                 
-                success_count = 0
-                error_count = 0
-                
-                for student in students:
+                # Generate for manually added students individually
+                for student in manually_added:
                     try:
                         generate_single_student_json(exam.id, student)
                         success_count += 1
                     except Exception as e:
-                        error_count += 1
-                        messages.error(request, f"Error generating file for student {student.roll_no}: {str(e)}")
+                        failure_count += 1
+                        error_details.append(f"Roll No {student.roll_no}: {str(e)}")
                 
-                if error_count > 0:
-                    messages.warning(request, f"Successfully generated files for {success_count} students, but failed for {error_count} students")
+                # Generate for regular students in bulk
+                if regular_students:
+                    try:
+                        generate_student_json_files(exam.id, regular_students)
+                        success_count += len(regular_students)
+                    except Exception as e:
+                        failure_count += len(regular_students)
+                        error_details.append(f"Bulk generation failed: {str(e)}")
+                
+                # If any failures occurred, don't start the exam
+                if failure_count > 0:
+                    messages.error(
+                        request,
+                        f"❌ Failed to generate exam files for {failure_count} students! "
+                        "Exam cannot be started until all files are generated successfully."
+                    )
+                    request.session['generation_errors'] = error_details
                     return redirect("take_exam")
                 
+                messages.success(request, f"✅ Successfully generated exam files for {success_count} students")
+            
+            # Only start the exam if all files were generated successfully
+            try:
                 exam.is_active = True
                 exam.start_time = now()
                 exam.save()
                 
+                # Ensure Result records exist
+                created_count = 0
                 for student in students:
-                    Result.objects.get_or_create(
+                    _, created = Result.objects.get_or_create(
                         student=student,
                         exam=exam,
                         defaults={
@@ -1111,20 +1296,30 @@ def take_exam(request):
                             'submitted_at': None
                         }
                     )
+                    if created:
+                        created_count += 1
                 
-                messages.success(request, f"Exam '{exam.exam_name}' has started successfully!")
+                if created_count > 0:
+                    messages.info(request, f"ℹ️ Created {created_count} new result records")
+                
+                messages.success(request, f"✅ Exam '{exam.exam_name}' has started successfully!")
+                return redirect("faculty_dashboard")
+                
+            except Exception as e:
+                messages.error(request, f"❌ Failed to start exam: {str(e)}")
                 return redirect("take_exam")
                 
-            except ExamSpecification.DoesNotExist:
-                messages.error(request, "Exam not found or you don't have permission!")
-            except Exception as e:
-                messages.error(request, f"Error starting exam: {str(e)}")
-        else:
-            messages.error(request, "Please select a valid exam.")
+        except ExamSpecification.DoesNotExist:
+            messages.error(request, "❌ Exam not found or you don't have permission to access it!")
+        except Exception as e:
+            messages.error(request, f"❌ Unexpected error: {str(e)}")
+    
+    # Get generation errors from session if they exist
+    generation_errors = request.session.pop('generation_errors', None)
     
     return render(request, "faculty/take_exam.html", {
         "exams": exams,
-        "active_exams": active_exams  # Pass active exams separately
+        "generation_errors": generation_errors
     })
 
 from django.core.exceptions import ObjectDoesNotExist

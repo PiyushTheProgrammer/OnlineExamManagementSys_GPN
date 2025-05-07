@@ -1183,7 +1183,7 @@
             <button type="button" class="btn btn-danger w-100 mt-3" id="deleteButton">
                 <i class="fas fa-trash-alt me-2"></i>Delete Questions
             </button>
-            
+
             <a href="{% url 'manage_questions' %}" class="btn btn-secondary w-100 mt-3">
                 <i class="fas fa-eye me-2"></i>View Questions
             </a>
@@ -1236,7 +1236,7 @@
             </div>
         </div>
 
-        {% if upload_errors %}
+        <!-- {% if upload_errors %}
         <div class="card error-card mt-4">
             <div class="card-header error-card-header">
                 <h4 class="mb-0">Upload Errors</h4>
@@ -1262,6 +1262,16 @@
                 </div>
             </div>
         </div>
+        {% endif %} -->
+        {% if upload_errors %}
+        <div class="alert alert-danger">
+            <h5>Errors:</h5>
+            <ul>
+                {% for error in upload_errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
         {% endif %}
     </div>
 
@@ -1275,52 +1285,52 @@
         document.addEventListener('DOMContentLoaded', function () {
             var modal = document.getElementById('deleteModal');
 
-                // Get the button that opens the modal
-                var btn = document.getElementById('deleteButton');
+            // Get the button that opens the modal
+            var btn = document.getElementById('deleteButton');
 
-                // Get the <span> element that closes the modal
-                var closeBtn = modal.querySelector('.btn-close');
-                var cancelBtn = modal.querySelector('.btn-secondary');
+            // Get the <span> element that closes the modal
+            var closeBtn = modal.querySelector('.btn-close');
+            var cancelBtn = modal.querySelector('.btn-secondary');
 
-                // When the user clicks the button, open the modal
-                btn.onclick = function () {
-                    modal.style.display = 'block';
-                    modal.classList.add('show');
-                }
+            // When the user clicks the button, open the modal
+            btn.onclick = function () {
+                modal.style.display = 'block';
+                modal.classList.add('show');
+            }
 
-                // When the user clicks on <span> (x), close the modal
-                closeBtn.onclick = function () {
+            // When the user clicks on <span> (x), close the modal
+            closeBtn.onclick = function () {
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
+
+            // When the user clicks on Cancel button, close the modal
+            cancelBtn.onclick = function () {
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
+
+            // When the user clicks anywhere outside of the modal, close it
+            window.onclick = function (event) {
+                if (event.target == modal) {
                     modal.style.display = 'none';
                     modal.classList.remove('show');
                 }
+            }
 
-                // When the user clicks on Cancel button, close the modal
-                cancelBtn.onclick = function () {
-                    modal.style.display = 'none';
-                    modal.classList.remove('show');
+            // Show/hide course and branch selects based on radio button selection
+            $('input[name="delete_option"]').change(function () {
+                if ($(this).val() === 'selected') {
+                    $('#courseSelectContainer').show();
+                    $('#courseSelect').prop('required', true);
+                } else {
+                    $('#courseSelectContainer').hide();
+                    $('#courseSelect').prop('required', false);
                 }
-
-                // When the user clicks anywhere outside of the modal, close it
-                window.onclick = function (event) {
-                    if (event.target == modal) {
-                        modal.style.display = 'none';
-                        modal.classList.remove('show');
-                    }
-                }
-
-                // Show/hide course and branch selects based on radio button selection
-                $('input[name="delete_option"]').change(function () {
-                    if ($(this).val() === 'selected') {
-                        $('#courseSelectContainer').show();
-                        $('#courseSelect').prop('required', true);
-                    } else {
-                        $('#courseSelectContainer').hide();
-                        $('#courseSelect').prop('required', false);
-                    }
-                });
+            });
 
             // Form submission validation
-            $('#deleteForm').submit(function(e) {
+            $('#deleteForm').submit(function (e) {
                 const deleteOption = $('input[name="delete_option"]:checked').val();
                 const courseSelect = $('#courseSelect');
 
@@ -1453,7 +1463,7 @@
                 setTimeout(() => {
                     alert.classList.add('fade');
                     setTimeout(() => alert.remove(), 150);
-                }, 3000);
+                }, 300000);
             });
         });
     </script>

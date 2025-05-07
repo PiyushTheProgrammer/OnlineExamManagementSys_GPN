@@ -150,26 +150,27 @@
         }
 
         /* Question status styling */
-        .correct-answer {
-            background-color: rgba(0, 230, 118, 0.1);
-            color: #00875A;
-            font-weight: bold;
-            border-left: 3px solid #00C853;
-        }
+        /* .correct-answer {
+            background-color: rgba(0, 230, 118, 0.1); /* Light green background */
+            /* color: #00875A; Green text */
+            /* font-weight: bold; */
+            /* border-left: 3px solid #00C853; Green border */
+        /* } 
 
         .incorrect-answer {
-            background-color: rgba(255, 61, 87, 0.1);
-            color: #DE350B;
-            font-weight: bold;
-            border-left: 3px solid #FF5252;
-        }
+            background-color: rgba(255, 61, 87, 0.1); /* Light red background */
+            /* color: #DE350B; Red text */
+            /* font-weight: bold; */
+            /* border-left: 3px solid #FF5252; Red border */
+        /* } */
 
-        .not-attempted {
-            background-color: var(--light-yellow);
-            color: var(--rich-blue);
-            font-weight: bold;
-            border-left: 3px solid var(--accent-yellow);
-        }
+        /* .not-attempted { */
+            /* background-color: rgba(255, 235, 59, 0.1); Light yellow background */
+            /* color: #FFAB00; Yellow text */
+            /* font-weight: bold; */
+            /* border-left: 3px solid #FFC107; Yellow border */
+        /* } */
+
         .MathJax {
             outline: none !important;
             font-size: 1.1em !important;
@@ -395,6 +396,40 @@
                 overflow: visible;
             }
         }
+        /* Box coloring only - keep text neutral */
+    .correct-answer-box {
+        background-color: #e8f5e9 !important;  /* Light green background */
+        border-left: 4px solid #2e7d32 !important;
+        padding: 10px;
+        color: inherit !important;  /* Keep original text color */
+    }
+
+    .student-correct {
+        background-color: #e8f5e9 !important;  /* Light green background */
+        border-left: 4px solid #2e7d32 !important;
+        padding: 10px;
+        color: inherit !important;
+    }
+
+    .student-incorrect {
+        background-color: #ffebee !important;  /* Light red background */
+        border-left: 4px solid #c62828 !important;
+        padding: 10px;
+        color: inherit !important;
+    }
+
+    .student-not-attempted {
+        background-color: #fff8e1 !important;  /* Light yellow background */
+        border-left: 4px solid #ffc107 !important;
+        padding: 10px;
+        color: inherit !important;
+    }
+
+    /* Ensure table cells show background colors */
+    .table td {
+        background-color: inherit !important;
+    }
+
     </style>
     <script>
         //Security-  Prevent Going Back to Exam
@@ -498,8 +533,8 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td>{{ q.question_text }}</td>
-                        <td class="correct-answer">{{ q.correct_answer }}</td>
-                        <td class="{% if q.attempted_answer == q.correct_answer %}correct-answer{% elif q.attempted_answer == 'Not Attempted' %}not-attempted{% else %}incorrect-answer{% endif %}">
+                        <td class="correct-answer-box">{{ q.correct_answer }}</td>
+                        <td class="{% if q.attempted_answer == q.correct_answer %}student-correct{% elif q.attempted_answer == 'Not Attempted' %}student-not-attempted{% else %}student-incorrect{% endif %}">
                             {{ q.attempted_answer }}
                         </td>
                     </tr>

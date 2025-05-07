@@ -503,4 +503,9 @@
         }
     }
 </style>
+{% if not user.is_authenticated %}
+    <script>
+        window.location.href = "{% url 'student_login' %}";
+    </script>
+{% endif %}
 </html>

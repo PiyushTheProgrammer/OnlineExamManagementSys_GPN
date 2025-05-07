@@ -4,6 +4,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.utils.deprecation import MiddlewareMixin
 
 class SingleSessionMiddleware:
     def __init__(self, get_response):
@@ -38,4 +39,9 @@ class SingleSessionMiddleware:
 # Comment out or remove the other middleware classes
 
 
-
+class NoCacheMiddleware(MiddlewareMixin):
+    def process_response(self, request, response):
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response

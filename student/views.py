@@ -157,6 +157,13 @@ def welcome(request):
         course_code__in=[course.code for course in registered_courses],
         is_active=True    # Only fetch active exams
     )
+    
+    if not scheduled_exams.exists():
+        # Log the student out and redirect to login
+        logout(request)
+        messages.warning(request, "You don't have any scheduled exams. Please contact your administrator.")
+        return redirect('student_login')  # Replace 'student_login' with your login URL name
+
     context = {
         "student_name": student.name,
         "student_rollno": student.roll_no,
